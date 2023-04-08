@@ -6,9 +6,11 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
-#define PORT 8080
 int main(int argc, char const* argv[])
 {
+    /**
+     * CREATING THE SOCKET AND CONNFIGURING IT
+    */
 	int server_fd, new_socket, valread;
 	struct sockaddr_in address;
 	int opt = 1;
@@ -22,7 +24,7 @@ int main(int argc, char const* argv[])
 		exit(EXIT_FAILURE);
 	}
 
-	// Forcefully attaching socket to the port 8080
+	// Forcefully attaching socket to the port any
 	if (setsockopt(server_fd, SOL_SOCKET,
 				SO_REUSEADDR | SO_REUSEPORT, &opt,
 				sizeof(opt))) {
@@ -30,6 +32,8 @@ int main(int argc, char const* argv[])
 		exit(EXIT_FAILURE);
 	}
 	address.sin_family = AF_INET;
+    // // Aws ip public should be defined here:
+    // serv_addr.sin_addr.s_addr = inet_addr("dirección IP pública de la instancia de AWS");
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons(atoi(argv[1]));
 
