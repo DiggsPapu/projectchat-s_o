@@ -45,6 +45,10 @@ int main(int argc, char const* argv[])
 	}
 	// This is the message
 	char buffer[8192];
+	// send(client_fd, hello, strlen(hello), 0);
+    // printf("Hello message sent\n");
+    // valread = read(client_fd, buffer, 1024);
+    // printf("%s\n", buffer);
 	// This is the message serialized
 	std::string message_serialized;
 	// This is the protocol format of the user info
