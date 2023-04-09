@@ -8,6 +8,7 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <arpa/inet.h>
 #include <pthread.h>
 #include <semaphore.h>
 #include "project.pb.h"
@@ -24,7 +25,7 @@ int main(int argc, char const* argv[])
     // In case the port is not indicated
     if (argc != 2)
     {
-        fprintf(stderr, "Use: server <puertodelservidor>\n");
+        fprintf(stderr, "Use: server <serverport>\n");
         return 1;
     }
 	// Assigning port
@@ -81,10 +82,14 @@ int main(int argc, char const* argv[])
 			perror("Error in accept");
             continue;
 		 }
+		struct UserData newClient;
+        newClient.u_socket = new_socket;
+        inet_ntop(AF_INET, &(new_connection.sin_addr), newClient.ipAddr, INET_ADDRSTRLEN);
+		valread = read(new_socket, buffer, 1024);
+		printf("%s\n", buffer);
 	}
 	
-	valread = read(new_socket, buffer, 1024);
-	printf("%s\n", buffer);
+	
 	send(new_socket, hello, strlen(hello), 0);
 	printf("Hello message sent\n");
 

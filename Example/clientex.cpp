@@ -6,15 +6,17 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <string.h>
+#include "project.pb.h"
 #define PORT 8080
 
 int main(int argc, char const* argv[])
 {
+
 	printf("%s\n",argv[1]);
 	int status, valread, client_fd;
 	struct sockaddr_in serv_addr;
 	char* hello = "Hello from client";
-	char buffer[1024] = { 0 };
 	if (argc != 4)
 	{
 		fprintf(stderr, "Client use: client <username> <server_ip> <server_port>\n");
@@ -41,8 +43,20 @@ int main(int argc, char const* argv[])
 		printf("\nConnection Failed \n");
 		return -1;
 	}
-	send(client_fd, hello, strlen(hello), 0);
-	printf("Hello message sent\n");
+	// This is the message
+	char buffer[8192];
+	// This is the message serialized
+	std::string message_serialized;
+	// This is the protocol format of the user info
+	chat::UserInfo *reg = new chat::UserInfo();
+	reg->set_username(argv[1]);//setusername
+	reg->set_ip(argv[2]);//setip
+	reg->set_status(1); //setstatus as active in the begginning
+	reg->SerializeToString(&message_serialized); //serializetostring
+	// Sending the message
+	strcpy(buffer, message_serialized.c_str());
+	send(client_fd, buffer, message_serialized.size()+1, 0);
+	printf("Establishing connection ...\n");
 	valread = read(client_fd, buffer, 1024);
 	printf("%s\n", buffer);
 
