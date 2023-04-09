@@ -11,7 +11,14 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include "project.pb.h"
-
+struct UserData
+{
+	int u_socket,status;
+	std::string username;
+    char ipAddr[INET_ADDRSTRLEN]; // INET_ADDRSTRLEN defines the max length of characters of an IP address
+};
+// Client list
+std::unordered_map<std::string, UserData *> clients;
 int main(int argc, char const* argv[])
 {
     // In case the port is not indicated
