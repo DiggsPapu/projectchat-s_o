@@ -14,6 +14,7 @@
 #include <semaphore.h>
 #include "project.pb.h"
 using namespace std;
+sem_t semaphore_clients;
 struct ChatClient
 {
     int socketFd;
@@ -21,17 +22,35 @@ struct ChatClient
     std::string ipAddr;
     int status;
 };
+// Mutex
+pthread_mutex_t lock;
+struct ChatClient createClient(char buffer[8192]){
+	// Creating the class userequest to parse from string the buffer
+	chat::UserRequest *receivedValue = new chat::UserRequest();
+	receivedValue->ParseFromString(buffer);
+	struct ChatClient newUser;
+	newUser.username = (receivedValue->newuser().username());
+	newUser.status = 1;
+	newUser.ipAddr = (receivedValue->newuser().ip());
+	return newUser;
+}
 // Client list
 std::unordered_map<std::string, ChatClient*> clients;
+void printConnectedClients(){
+	for (auto i:clients){
+		cout<<"username: "<<i.first<<" ip: "<<i.second<<endl;
+	}
+}
 // Handling client responses and everything in thread
 void *handlingClient(void *params)
 {
 	struct ChatClient *user = (struct ChatClient *) params;
-	cout<<user->username<<" arrived the thread"<<endl;
+	printConnectedClients();
 	chat::UserRequest *request = new chat::UserRequest();
 	char buffer[8192];
 	while (user->status!=3)
 	{
+		cout<<user->username<<" socket: "<<user->socketFd<<endl;
 		read(user->socketFd, buffer, 8192);	
 		request->ParseFromString(buffer);
 		switch (request->option())
@@ -42,15 +61,12 @@ void *handlingClient(void *params)
 			}
 			case 3:
 			{
-
 				switch (request->status().newstatus())
 				{
 					case 1:
 					{
 						cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has changed status to ACTIVE"<<endl;
-						user->status = 3;
-						clients.erase(user->username);
-						close(user->socketFd);
+						user->status = 1;
 						break;
 					}
 					case 2:
@@ -79,10 +95,13 @@ void *handlingClient(void *params)
 		}
 	}
 	cout<<"Connection ended with the username "<<user->username<<" and ip "<<user->ipAddr<<endl;
+	printConnectedClients();
     pthread_exit(0);
 }
 int main(int argc, char const* argv[])
 {
+	// Semaphore shared between threads init
+	sem_init(&semaphore_clients, 0, 1);
     // In case the port is not indicated
     if (argc != 2)
     {
@@ -94,15 +113,16 @@ int main(int argc, char const* argv[])
     /**
      * CREATING THE SOCKET AND CONNFIGURING IT
     */
-	int server_fd, new_socket, valread;
+	int server_fd, new_socket;
 	struct sockaddr_in address, new_connection;
+	struct sockaddr_storage serverStorage;
     socklen_t new_conn_size;
 	int opt = 1;
 	int addrlen = sizeof(address);
 	char buffer[8192] = { 0 };
 
 	// Creating socket file descriptor
-	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+	if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
 		perror("Server: socket failed");
 		exit(EXIT_FAILURE);
 	}
@@ -123,35 +143,30 @@ int main(int argc, char const* argv[])
 		perror("Server: bind failed IP socket->port");
 		exit(EXIT_FAILURE);
 	}
-	if (listen(server_fd, 5) < 0) { //5 first connection before refused.
-		perror("listen");
+	if (listen(server_fd, 5) != 0) { //5 first connection before refused.
+		perror("listen\n");
 		exit(EXIT_FAILURE);
 	}
-	printf("Listening on port %d\n", port);
+	printf("Listening on port %d\n", port);\
 	while (true)
 	{
-		if ((new_socket= accept(server_fd, (struct sockaddr*)&address,(socklen_t*)&addrlen))< 0) 
+		if ((new_socket= accept(server_fd, (struct sockaddr*)&serverStorage,(socklen_t*)&addrlen))< 0) 
 		{
 		perror("accept");
 		exit(EXIT_FAILURE);
 		}
 		/**
-		 * RECEPTION
+		 * CONNECTION
 		*/
 		// Got the response and saved it in buffer
-		valread = read(new_socket, buffer, 8192);
-		// Creating the class userequest to parse from string the buffer
-		chat::UserRequest *receivedValue = new chat::UserRequest();
-		receivedValue->ParseFromString(buffer);
+		recv(new_socket, &buffer, sizeof(buffer),0);
 		// Create a new user and send it to a function to know if it already exists
-		struct ChatClient newUser;
-		newUser.username = (receivedValue->newuser().username());
-		newUser.status = 1;
+		struct ChatClient newUser = createClient(buffer);
 		newUser.socketFd = new_socket;
-		newUser.ipAddr = (receivedValue->newuser().ip());
+
 		for (auto i:clients)
 		{
-			if(clients.find(newUser.username)!=clients.end() || i.second->ipAddr==receivedValue->newuser().ip())
+			if(clients.find(newUser.username)!=clients.end() ) //|| i.second->ipAddr==receivedValue->newuser().ip()
 			{
 				// Sending a response of error
 				chat::ServerResponse *response = new chat::ServerResponse();
@@ -165,6 +180,7 @@ int main(int argc, char const* argv[])
 				send(new_socket, buffer, message_serialized.size()+1, 0);
 				cout<<"Connection failed (ERROR 400) with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
 				close(new_socket);
+				return 0;
 			}
 		}
 		clients[newUser.username]=&newUser;
@@ -180,11 +196,8 @@ int main(int argc, char const* argv[])
 		strcpy(buffer, message_serialized.c_str());
 		send(new_socket, buffer, message_serialized.size()+1, 0);
 		pthread_t thread_id;
-        pthread_attr_t attrs;
-        pthread_attr_init(&attrs);
-		// Save socket
-		receivedValue->set_option(new_socket);
-        pthread_create(&thread_id, &attrs, handlingClient, (void *)&newUser);
+        pthread_create(&thread_id,NULL, handlingClient, (void *)&newUser);
+		pthread_join(thread_id, NULL);
 	}
 	// closing the connected socket
 	close(new_socket);
