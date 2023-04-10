@@ -12,7 +12,6 @@
 using namespace std;
 int main(int argc, char const* argv[])
 {
-
 	printf("%s\n",argv[1]);
 	int status, valread, client_fd;
 	struct sockaddr_in serv_addr;
@@ -30,8 +29,7 @@ int main(int argc, char const* argv[])
 	serv_addr.sin_family = AF_INET;
 	serv_addr.sin_port = htons(port);
 
-	// Convert IPv4 and IPv6 addresses from text to binary
-	// form
+	// Convert IPv4 and IPv6 addresses from text to binary form
 	if (inet_pton(AF_INET, argv[2], &serv_addr.sin_addr)
 		<= 0) {
 		printf(
@@ -67,20 +65,22 @@ int main(int argc, char const* argv[])
 	strcpy(buffer, message_serialized.c_str());
 	send(client_fd, buffer, message_serialized.size()+1, 0);
 	printf("Establishing connection ...\n");
+	// Reading a response from server
 	valread = read(client_fd, buffer, 8192);
+	// Server response protocol format
 	chat::ServerResponse *registerResponse = new chat::ServerResponse();
 	registerResponse->ParseFromString(buffer);
 	cout<<registerResponse->servermessage()<<endl;
+	// In case this connection is not good the socket is closed and exit from the program
 	if(registerResponse->code()!=200){
 		close(client_fd);
+		return 0;
 	}
 	// This is while socket not closed
 	while (true)
 	{
 		/* code */
 	}
-	
-
 	// closing the connected socket
 	close(client_fd);
 	return 0;

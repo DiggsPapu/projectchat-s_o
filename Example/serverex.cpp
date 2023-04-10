@@ -2,6 +2,7 @@
  * Diego Andres Alonzo Medinilla - 20172
  * S_O 2023 Project 1
 */
+#include <iostream>
 #include <netinet/in.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -12,6 +13,7 @@
 #include <pthread.h>
 #include <semaphore.h>
 #include "project.pb.h"
+using namespace std;
 struct UserData
 {
 	int u_socket,status;
@@ -19,7 +21,7 @@ struct UserData
     char ipAddr[INET_ADDRSTRLEN]; // INET_ADDRSTRLEN defines the max length of characters of an IP address
 };
 // Client list
-std::unordered_map<std::string, UserData *> clients;
+std::unordered_map<std::string, chat::UserInfo*> clients;
 void *Register(void *params)
 {
 	if (clients.size())
@@ -96,24 +98,46 @@ int main(int argc, char const* argv[])
 		chat::UserRequest *receivedValue = new chat::UserRequest();
 		receivedValue->ParseFromString(buffer);
 		printf("The option gotten was: %d\n",receivedValue->option());
+		// Create a new user and send it to a function to know if it already exists
+		chat::UserInfo *newUser = new chat::UserInfo();
+		newUser->set_ip(receivedValue->newuser().ip());
+		newUser->set_username(receivedValue->newuser().username());
+		newUser->set_status(1);
+		for (auto i:clients)
+		{
+			if(clients.find(newUser->username())==clients.end() || i.second->ip()==newUser->ip())
+			{
+				// Sending a response of error
+				chat::ServerResponse *response = new chat::ServerResponse();
+				response->set_option(1);
+				response->set_code(400);
+				response->set_servermessage("Connection Error, the username/ip is already registered");
+				// This is the message serialized
+				std::string message_serialized;
+				response->SerializeToString(&message_serialized);
+				// send(new_socket, hello, strlen(hello), 0);
+				strcpy(buffer, message_serialized.c_str());
+				send(new_socket, buffer, message_serialized.size()+1, 0);
+				cout<<"Connection failed (ERROR 400) with the username "<<newUser->username()<<" and ip "<<newUser->ip()<<endl;
+			}
+		}
+		cout<<"Connection established with the username "<<newUser->username()<<" and ip "<<newUser->ip()<<endl;
 		// Sending a response of received
 		chat::ServerResponse *response = new chat::ServerResponse();
 		response->set_option(1);
 		response->set_code(200);
-		response->set_servermessage("Connection established correctly\n");
+		response->set_servermessage("Connection established correctly!\n");
 		// This is the message serialized
 		std::string message_serialized;
 		response->SerializeToString(&message_serialized);
 		// send(new_socket, hello, strlen(hello), 0);
 		strcpy(buffer, message_serialized.c_str());
 		send(new_socket, buffer, message_serialized.size()+1, 0);
-		struct UserData newClient;
-        newClient.u_socket = new_socket;
-        inet_ntop(AF_INET, &(new_connection.sin_addr), newClient.ipAddr, INET_ADDRSTRLEN);
+		
 		pthread_t thread_id;
         pthread_attr_t attrs;
         pthread_attr_init(&attrs);
-        pthread_create(&thread_id, &attrs, Register, (void *)&newClient);
+        // pthread_create(&thread_id, &attrs, Register, (void *)&newClient);
 	}
 	// closing the connected socket
 	close(new_socket);
