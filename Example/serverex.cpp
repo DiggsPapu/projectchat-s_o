@@ -53,7 +53,6 @@ int main(int argc, char const* argv[])
 	int opt = 1;
 	int addrlen = sizeof(address);
 	char buffer[8192] = { 0 };
-	char* hello = "Hello from server";
 
 	// Creating socket file descriptor
 	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
@@ -115,7 +114,6 @@ int main(int argc, char const* argv[])
 				// This is the message serialized
 				std::string message_serialized;
 				response->SerializeToString(&message_serialized);
-				// send(new_socket, hello, strlen(hello), 0);
 				strcpy(buffer, message_serialized.c_str());
 				send(new_socket, buffer, message_serialized.size()+1, 0);
 				cout<<"Connection failed (ERROR 400) with the username "<<newUser->username()<<" and ip "<<newUser->ip()<<endl;
@@ -130,7 +128,6 @@ int main(int argc, char const* argv[])
 		// This is the message serialized
 		std::string message_serialized;
 		response->SerializeToString(&message_serialized);
-		// send(new_socket, hello, strlen(hello), 0);
 		strcpy(buffer, message_serialized.c_str());
 		send(new_socket, buffer, message_serialized.size()+1, 0);
 		

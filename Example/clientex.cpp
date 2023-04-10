@@ -15,7 +15,6 @@ int main(int argc, char const* argv[])
 	printf("%s\n",argv[1]);
 	int status, valread, client_fd;
 	struct sockaddr_in serv_addr;
-	char* hello = "Hello from client";
 	if (argc != 4)
 	{
 		fprintf(stderr, "Client use: client <username> <server_ip> <server_port>\n");
