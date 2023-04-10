@@ -24,6 +24,8 @@ struct ChatClient
 };
 // Mutex
 pthread_mutex_t lock;
+// Client list
+std::unordered_map<std::string, ChatClient*> clients;
 struct ChatClient createClient(char buffer[8192]){
 	// Creating the class userequest to parse from string the buffer
 	chat::UserRequest *receivedValue = new chat::UserRequest();
@@ -34,20 +36,55 @@ struct ChatClient createClient(char buffer[8192]){
 	newUser.ipAddr = (receivedValue->newuser().ip());
 	return newUser;
 }
-// Client list
-std::unordered_map<std::string, ChatClient*> clients;
+// Print the connected clients
 void printConnectedClients(){
 	for (auto i:clients){
 		cout<<"username: "<<i.first<<" ip: "<<i.second<<endl;
 	}
 }
+// To check if in client list
+int inClientList(struct ChatClient newUser){
+	char buffer[8192] = { 0 };
+	for (auto i:clients)
+		{
+			if(clients.find(newUser.username)!=clients.end() ) //|| i.second->ipAddr==receivedValue->newuser().ip()
+			{
+				// Sending a response of error
+				chat::ServerResponse *response = new chat::ServerResponse();
+				response->set_option(1);
+				response->set_code(400);
+				response->set_servermessage("Connection Error, the username/ip is already registered");
+				// This is the message serialized
+				std::string message_serialized;
+				response->SerializeToString(&message_serialized);
+				strcpy(buffer, message_serialized.c_str());
+				send(newUser.socketFd, buffer, message_serialized.size()+1, 0);
+				cout<<"Connection failed (ERROR 400) with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
+				close(newUser.socketFd);
+				return 0;
+			}
+		}
+		clients[newUser.username]=&newUser;
+		cout<<"Connection established with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
+		return 1;
+}
 // Handling client responses and everything in thread
 void *handlingClient(void *params)
 {
 	struct ChatClient *user = (struct ChatClient *) params;
+	char buffer[8192];
+	// Sending a response of connection established
+	chat::ServerResponse *response = new chat::ServerResponse();
+	response->set_option(1);
+	response->set_code(200);
+	response->set_servermessage("Connection established correctly!\n");
+	// This is the message serialized
+	std::string message_serialized;
+	response->SerializeToString(&message_serialized);
+	strcpy(buffer, message_serialized.c_str());
+	send(user->socketFd, buffer, message_serialized.size()+1, 0);
 	printConnectedClients();
 	chat::UserRequest *request = new chat::UserRequest();
-	char buffer[8192];
 	while (user->status!=3)
 	{
 		cout<<user->username<<" socket: "<<user->socketFd<<endl;
@@ -116,9 +153,8 @@ int main(int argc, char const* argv[])
 	int server_fd, new_socket;
 	struct sockaddr_in address, new_connection;
 	struct sockaddr_storage serverStorage;
-    socklen_t new_conn_size;
 	int opt = 1;
-	int addrlen = sizeof(address);
+	socklen_t addrlen = sizeof(serverStorage);
 	char buffer[8192] = { 0 };
 
 	// Creating socket file descriptor
@@ -148,56 +184,21 @@ int main(int argc, char const* argv[])
 		exit(EXIT_FAILURE);
 	}
 	printf("Listening on port %d\n", port);\
-	while (true)
-	{
-		if ((new_socket= accept(server_fd, (struct sockaddr*)&serverStorage,(socklen_t*)&addrlen))< 0) 
-		{
+	while (true){
+		if ((new_socket= accept(server_fd, (struct sockaddr*)&serverStorage,(socklen_t*)&addrlen))< 0) {
 		perror("accept");
 		exit(EXIT_FAILURE);
 		}
-		/**
-		 * CONNECTION
-		*/
+		// ____________CONNECTION_____________
 		// Got the response and saved it in buffer
 		recv(new_socket, &buffer, sizeof(buffer),0);
-		// Create a new user and send it to a function to know if it already exists
+		// Create a new user with a function and assigning sockets
 		struct ChatClient newUser = createClient(buffer);
 		newUser.socketFd = new_socket;
-
-		for (auto i:clients)
-		{
-			if(clients.find(newUser.username)!=clients.end() ) //|| i.second->ipAddr==receivedValue->newuser().ip()
-			{
-				// Sending a response of error
-				chat::ServerResponse *response = new chat::ServerResponse();
-				response->set_option(1);
-				response->set_code(400);
-				response->set_servermessage("Connection Error, the username/ip is already registered");
-				// This is the message serialized
-				std::string message_serialized;
-				response->SerializeToString(&message_serialized);
-				strcpy(buffer, message_serialized.c_str());
-				send(new_socket, buffer, message_serialized.size()+1, 0);
-				cout<<"Connection failed (ERROR 400) with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
-				close(new_socket);
-				return 0;
-			}
-		}
-		clients[newUser.username]=&newUser;
-		cout<<"Connection established with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
-		// Sending a response of connection established
-		chat::ServerResponse *response = new chat::ServerResponse();
-		response->set_option(1);
-		response->set_code(200);
-		response->set_servermessage("Connection established correctly!\n");
-		// This is the message serialized
-		std::string message_serialized;
-		response->SerializeToString(&message_serialized);
-		strcpy(buffer, message_serialized.c_str());
-		send(new_socket, buffer, message_serialized.size()+1, 0);
 		pthread_t thread_id;
-        pthread_create(&thread_id,NULL, handlingClient, (void *)&newUser);
-		pthread_join(thread_id, NULL);
+		if(inClientList(newUser)){
+			pthread_create(&thread_id,NULL, handlingClient, (void *)&newUser);
+		}
 	}
 	// closing the connected socket
 	close(new_socket);
