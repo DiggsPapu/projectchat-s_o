@@ -22,7 +22,15 @@ struct UserData
 std::unordered_map<std::string, UserData *> clients;
 void *Register(void *params)
 {
-	printf("hola\n");
+	if (clients.size())
+	{
+		/* code */
+	}
+	while (true)
+	{
+		/* code */
+	}
+	
 }
 int main(int argc, char const* argv[])
 {
@@ -42,7 +50,7 @@ int main(int argc, char const* argv[])
     socklen_t new_conn_size;
 	int opt = 1;
 	int addrlen = sizeof(address);
-	char buffer[1024] = { 0 };
+	char buffer[8192] = { 0 };
 	char* hello = "Hello from server";
 
 	// Creating socket file descriptor
@@ -71,6 +79,7 @@ int main(int argc, char const* argv[])
 		perror("listen");
 		exit(EXIT_FAILURE);
 	}
+	printf("Listening on port %d\n", port);
 	while (true)
 	{
 		if ((new_socket= accept(server_fd, (struct sockaddr*)&address,(socklen_t*)&addrlen))< 0) 
@@ -78,32 +87,34 @@ int main(int argc, char const* argv[])
 		perror("accept");
 		exit(EXIT_FAILURE);
 		}
-		printf("Listening on port %d\n", port);
-		valread = read(new_socket, buffer, 1024);
-		printf("%s\n", buffer);
-		send(new_socket, hello, strlen(hello), 0);
-		printf("Hello message sent\n");
+		/**
+		 * RECEPTION
+		*/
+		// Got the response and saved it in buffer
+		valread = read(new_socket, buffer, 8192);
+		// Creating the class userequest to parse from string the buffer
+		chat::UserRequest *receivedValue = new chat::UserRequest();
+		receivedValue->ParseFromString(buffer);
+		printf("The option gotten was: %d\n",receivedValue->option());
+		// Sending a response of received
+		chat::ServerResponse *response = new chat::ServerResponse();
+		response->set_option(1);
+		response->set_code(200);
+		response->set_servermessage("Connection established correctly\n");
+		// This is the message serialized
+		std::string message_serialized;
+		response->SerializeToString(&message_serialized);
+		// send(new_socket, hello, strlen(hello), 0);
+		strcpy(buffer, message_serialized.c_str());
+		send(new_socket, buffer, message_serialized.size()+1, 0);
+		struct UserData newClient;
+        newClient.u_socket = new_socket;
+        inet_ntop(AF_INET, &(new_connection.sin_addr), newClient.ipAddr, INET_ADDRSTRLEN);
+		pthread_t thread_id;
+        pthread_attr_t attrs;
+        pthread_attr_init(&attrs);
+        pthread_create(&thread_id, &attrs, Register, (void *)&newClient);
 	}
-	
-	// while (true)
-	// {
-	// 	new_conn_size = sizeof new_connection;
-	// 	 if (accept(server_fd, (struct sockaddr *)&new_connection, &new_conn_size)==-1)
-	// 	 {
-	// 		perror("Error in accept");
-    //         continue;
-	// 	 }
-	// 	recv(server_fd, buffer, 8192, 0);
-	// 	send(new_socket, hello, strlen(hello), 0);
-	// 	struct UserData newClient;
-    //     newClient.u_socket = new_socket;
-    //     inet_ntop(AF_INET, &(new_connection.sin_addr), newClient.ipAddr, INET_ADDRSTRLEN);
-	// 	pthread_t thread_id;
-    //     pthread_attr_t attrs;
-    //     pthread_attr_init(&attrs);
-    //     pthread_create(&thread_id, &attrs, Register, (void *)&newClient);
-	// }
-
 	// closing the connected socket
 	close(new_socket);
 	// closing the listening socket

@@ -8,8 +8,8 @@
 #include <unistd.h>
 #include <string.h>
 #include "project.pb.h"
-#define PORT 8080
-
+#include <iostream>
+using namespace std;
 int main(int argc, char const* argv[])
 {
 
@@ -43,26 +43,43 @@ int main(int argc, char const* argv[])
 		printf("\nConnection Failed \n");
 		return -1;
 	}
+	// Get ip address
+	char ip_v[80];
+	const char* p = inet_ntop(AF_INET, &serv_addr.sin_addr, ip_v, 80);
+    if(p != NULL)
+    {
+        std::cout << "Local IP address is: " << ip_v << std::endl;
+    }
 	// This is the message
 	char buffer[8192];
-	// send(client_fd, hello, strlen(hello), 0);
-    // printf("Hello message sent\n");
-    // valread = read(client_fd, buffer, 1024);
-    // printf("%s\n", buffer);
 	// This is the message serialized
 	std::string message_serialized;
-	// This is the protocol format of the user info
-	chat::UserInfo *reg = new chat::UserInfo();
+	// This is the protocol format of the UserRegister
+	chat::UserRegister *reg = new chat::UserRegister();
 	reg->set_username(argv[1]);//setusername
-	reg->set_ip(argv[2]);//setip
-	reg->set_status(1); //setstatus as active in the begginning
-	reg->SerializeToString(&message_serialized); //serializetostring
+	reg->set_ip(ip_v);//setip
+	// This is the protocol format of the UserRequest in this case 4 register
+	chat::UserRequest *request = new chat::UserRequest();
+	request->set_option(1); // option 1 means register
+	request->set_allocated_newuser(reg); //the user register entered
+	request->SerializeToString(&message_serialized); //serializetostring
 	// Sending the message
 	strcpy(buffer, message_serialized.c_str());
 	send(client_fd, buffer, message_serialized.size()+1, 0);
 	printf("Establishing connection ...\n");
-	valread = read(client_fd, buffer, 1024);
-	printf("%s\n", buffer);
+	valread = read(client_fd, buffer, 8192);
+	chat::ServerResponse *registerResponse = new chat::ServerResponse();
+	registerResponse->ParseFromString(buffer);
+	cout<<registerResponse->servermessage()<<endl;
+	if(registerResponse->code()!=200){
+		close(client_fd);
+	}
+	// This is while socket not closed
+	while (true)
+	{
+		/* code */
+	}
+	
 
 	// closing the connected socket
 	close(client_fd);
