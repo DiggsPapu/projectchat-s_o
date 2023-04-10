@@ -14,25 +14,72 @@
 #include <semaphore.h>
 #include "project.pb.h"
 using namespace std;
-struct UserData
+struct ChatClient
 {
-	int u_socket,status;
-	std::string username;
-    char ipAddr[INET_ADDRSTRLEN]; // INET_ADDRSTRLEN defines the max length of characters of an IP address
+    int socketFd;
+    std::string username;
+    std::string ipAddr;
+    int status;
 };
 // Client list
-std::unordered_map<std::string, chat::UserInfo*> clients;
-void *Register(void *params)
+std::unordered_map<std::string, ChatClient*> clients;
+// Handling client responses and everything in thread
+void *handlingClient(void *params)
 {
-	if (clients.size())
+	struct ChatClient *user = (struct ChatClient *) params;
+	cout<<user->username<<" arrived the thread"<<endl;
+	chat::UserRequest *request = new chat::UserRequest();
+	char buffer[8192];
+	while (user->status!=3)
 	{
-		/* code */
+		read(user->socketFd, buffer, 8192);	
+		request->ParseFromString(buffer);
+		switch (request->option())
+		{
+			case 0:
+			{
+				break;
+			}
+			case 3:
+			{
+
+				switch (request->status().newstatus())
+				{
+					case 1:
+					{
+						cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has changed status to ACTIVE"<<endl;
+						user->status = 3;
+						clients.erase(user->username);
+						close(user->socketFd);
+						break;
+					}
+					case 2:
+					{
+						cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has changed status to OCCUPATED"<<endl;
+						user->status = 2;
+						break;
+					}
+					case 3:
+					{
+						cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has changed status to INACTIVE, logged out"<<endl;
+						user->status = 3;
+						clients.erase(user->username);
+						close(user->socketFd);
+						break;
+					}					
+					default:{cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has sent an invalid status"<<endl;break;}
+				}
+				break;
+			}
+			default:
+			{
+				cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" sent an invalid value"<<endl;
+				break;
+			}			
+		}
 	}
-	while (true)
-	{
-		/* code */
-	}
-	
+	cout<<"Connection ended with the username "<<user->username<<" and ip "<<user->ipAddr<<endl;
+    pthread_exit(0);
 }
 int main(int argc, char const* argv[])
 {
@@ -96,15 +143,15 @@ int main(int argc, char const* argv[])
 		// Creating the class userequest to parse from string the buffer
 		chat::UserRequest *receivedValue = new chat::UserRequest();
 		receivedValue->ParseFromString(buffer);
-		printf("The option gotten was: %d\n",receivedValue->option());
 		// Create a new user and send it to a function to know if it already exists
-		chat::UserInfo *newUser = new chat::UserInfo();
-		newUser->set_ip(receivedValue->newuser().ip());
-		newUser->set_username(receivedValue->newuser().username());
-		newUser->set_status(1);
+		struct ChatClient newUser;
+		newUser.username = (receivedValue->newuser().username());
+		newUser.status = 1;
+		newUser.socketFd = new_socket;
+		newUser.ipAddr = (receivedValue->newuser().ip());
 		for (auto i:clients)
 		{
-			if(clients.find(newUser->username())==clients.end() || i.second->ip()==newUser->ip())
+			if(clients.find(newUser.username)!=clients.end() || i.second->ipAddr==receivedValue->newuser().ip())
 			{
 				// Sending a response of error
 				chat::ServerResponse *response = new chat::ServerResponse();
@@ -116,11 +163,13 @@ int main(int argc, char const* argv[])
 				response->SerializeToString(&message_serialized);
 				strcpy(buffer, message_serialized.c_str());
 				send(new_socket, buffer, message_serialized.size()+1, 0);
-				cout<<"Connection failed (ERROR 400) with the username "<<newUser->username()<<" and ip "<<newUser->ip()<<endl;
+				cout<<"Connection failed (ERROR 400) with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
+				close(new_socket);
 			}
 		}
-		cout<<"Connection established with the username "<<newUser->username()<<" and ip "<<newUser->ip()<<endl;
-		// Sending a response of received
+		clients[newUser.username]=&newUser;
+		cout<<"Connection established with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
+		// Sending a response of connection established
 		chat::ServerResponse *response = new chat::ServerResponse();
 		response->set_option(1);
 		response->set_code(200);
@@ -130,11 +179,12 @@ int main(int argc, char const* argv[])
 		response->SerializeToString(&message_serialized);
 		strcpy(buffer, message_serialized.c_str());
 		send(new_socket, buffer, message_serialized.size()+1, 0);
-		
 		pthread_t thread_id;
         pthread_attr_t attrs;
         pthread_attr_init(&attrs);
-        // pthread_create(&thread_id, &attrs, Register, (void *)&newClient);
+		// Save socket
+		receivedValue->set_option(new_socket);
+        pthread_create(&thread_id, &attrs, handlingClient, (void *)&newUser);
 	}
 	// closing the connected socket
 	close(new_socket);

@@ -10,6 +10,16 @@
 #include "project.pb.h"
 #include <iostream>
 using namespace std;
+// Print menu
+void printMenu(){
+	cout<<"1 -> Chat with everyone in the chat (Broadcasting)"<<endl;
+	cout<<"2 -> Send a private message"<<endl;
+	cout<<"3 -> Change status"<<endl;
+	cout<<"4 -> List connected users in the chat system"<<endl;
+	cout<<"5 -> Deploy info from a particular user"<<endl;
+	cout<<"6 -> Help"<<endl;
+	cout<<"7 -> Exit"<<endl;
+}
 int main(int argc, char const* argv[])
 {
 	printf("%s\n",argv[1]);
@@ -75,10 +85,38 @@ int main(int argc, char const* argv[])
 		close(client_fd);
 		return 0;
 	}
+	
 	// This is while socket not closed
-	while (true)
+	int option,open = 1;
+	while (open)
 	{
-		/* code */
+		printMenu();
+		cin>>option;
+		switch (option)
+		{
+			case 7:
+			{
+				chat::ChangeStatus *status = new chat::ChangeStatus();
+				status->set_newstatus(3);
+				status->set_username(argv[1]);
+				chat::UserRequest *ureq = new chat::UserRequest();
+				ureq->set_option(3); // option 1 means register
+				ureq->set_allocated_status(status); //the user register entered
+				ureq->SerializeToString(&message_serialized); //serializetostring
+				// Sending the message
+				strcpy(buffer, message_serialized.c_str());
+				send(client_fd, buffer, message_serialized.size()+1, 0);
+				close(client_fd);
+				printf("Logging out.\n");
+				open = 0;
+				break;
+			}
+			default:
+			{
+				cout<<"The option entered is invalid"<<endl;
+				break;
+			}
+		}
 	}
 	// closing the connected socket
 	close(client_fd);
