@@ -101,11 +101,17 @@ int main(int argc, char const* argv[])
 	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),s, sizeof s);
 	printf("CONNECTED IP: %s\n", s);
 	freeaddrinfo(servinfo);
-    // Message register
-	char buffer[8192];
+	// Defining the structs to send messages using the protocol
 	std::string message_serialized;
     chat::UserRequest *request = new chat::UserRequest();
     chat::UserRegister *reg = new chat::UserRegister();
+	chat::UserInfoRequest *info = new chat::UserInfoRequest();
+	chat::AllConnectedUsers *a_users = new chat::AllConnectedUsers();
+	chat::newMessage *m_new = new chat::newMessage();
+	chat::ChangeStatus *newStatus = new chat::ChangeStatus();
+    chat::ServerResponse *serverMessage = new chat::ServerResponse();
+    // Message register
+	char buffer[8192];
     reg->set_username(argv[1]);
     reg->set_ip(s);
     request->set_option(1);
@@ -114,13 +120,12 @@ int main(int argc, char const* argv[])
 	strcpy(buffer, message_serialized.c_str());
 	send(sockfd, buffer, message_serialized.size() + 1, 0);
 	recv(sockfd, buffer, 8192, 0);
-    chat::ServerResponse serverMessage;
-	serverMessage.ParseFromString(buffer);
-	if(serverMessage.code() != 200){
-			std::cout << serverMessage.servermessage()<< std::endl;
+	serverMessage->ParseFromString(buffer);
+	if(serverMessage->code() != 200){
+			std::cout << serverMessage->servermessage()<< std::endl;
 			return 0;
 	}
-	std::cout << "SERVER: "<< serverMessage.servermessage()<< std::endl;	
+	std::cout << "SERVER: "<< serverMessage->servermessage()<< std::endl;	
 	connected = 1;
 	pthread_t thread_id;
 	pthread_attr_t attrs;
@@ -137,6 +142,7 @@ int main(int argc, char const* argv[])
                 break;
             }
             case 4:{
+
                 break;
             }
             case 7:{
@@ -148,5 +154,6 @@ int main(int argc, char const* argv[])
             }
         }
     }
+	printf("Thanks for using this server chat %s\nSee ya soon!",argv[1]);
 	return 0;
 }

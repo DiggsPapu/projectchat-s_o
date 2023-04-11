@@ -49,7 +49,7 @@ void *ThreadWork(void *params)
     while (1){
         if (recv(socketFd, buffer, 8192, 0) < 1){
             if (recv(socketFd, buffer, 8192, 0) == 0){
-                std::cout<<"__LOGGING OUT__\n"<< "The client named: "<< user.username<< " has logged out"<< std::endl;
+                std::cout<<std::endl<<"__LOGGING OUT__\n"<< "The client named: "<< user.username<< " has logged out"<< std::endl;
 				clients.erase(user.username);
             }
             break;
