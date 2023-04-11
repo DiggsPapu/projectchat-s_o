@@ -137,6 +137,7 @@ void *handlingClient(void *params)
 }
 int main(int argc, char const* argv[])
 {
+    GOOGLE_PROTOBUF_VERIFY_VERSION;
 	// Semaphore shared between threads init
 	sem_init(&semaphore_clients, 0, 1);
     // In case the port is not indicated
@@ -156,35 +157,30 @@ int main(int argc, char const* argv[])
 	int opt = 1;
 	socklen_t addrlen = sizeof(serverStorage);
 	char buffer[8192] = { 0 };
-
-	// Creating socket file descriptor
-	if ((server_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) < 0) {
-		perror("Server: socket failed");
-		exit(EXIT_FAILURE);
-	}
-
-	// Forcefully attaching socket to the port any
-	if (setsockopt(server_fd, SOL_SOCKET,SO_REUSEADDR | SO_REUSEPORT, &opt,sizeof(opt))) {
-		perror("Server: set socket options failed");
-		exit(EXIT_FAILURE);
-	}
 	address.sin_family = AF_INET;
     // // Aws ip public should be defined here:
     // serv_addr.sin_addr.s_addr = inet_addr("dirección IP pública de la instancia de AWS");
 	address.sin_addr.s_addr = INADDR_ANY;
 	address.sin_port = htons(port);
-
+	memset(address.sin_zero, 0, sizeof address.sin_zero);
+	// Creating socket file descriptor
+	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
+		perror("Server: socket failed");
+		exit(EXIT_FAILURE);
+	}
 	// Forcefully attaching socket to the port entered
 	if (bind(server_fd, (struct sockaddr*)&address,sizeof(address))< 0) {
 		perror("Server: bind failed IP socket->port");
 		exit(EXIT_FAILURE);
 	}
+	// Listen the entered connection
 	if (listen(server_fd, 5) != 0) { //5 first connection before refused.
 		perror("listen\n");
 		exit(EXIT_FAILURE);
 	}
 	printf("Listening on port %d\n", port);\
 	while (true){
+		addrlen = sizeof new_connection;
 		if ((new_socket= accept(server_fd, (struct sockaddr*)&serverStorage,(socklen_t*)&addrlen))< 0) {
 		perror("accept");
 		exit(EXIT_FAILURE);
@@ -204,5 +200,6 @@ int main(int argc, char const* argv[])
 	close(new_socket);
 	// closing the listening socket
 	shutdown(server_fd, SHUT_RDWR);
+    google::protobuf::ShutdownProtobufLibrary();
 	return 0;
 }
