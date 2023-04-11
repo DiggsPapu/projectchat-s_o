@@ -46,50 +46,62 @@ void *ThreadWork(void *params)
     std::string msgSerialized;
     chat::UserRequest request ;
 	chat::UserRegister reg;
-    while (1)
-    {
-        if (recv(socketFd, buffer, 8192, 0) < 1)
-        {
-            if (recv(socketFd, buffer, 8192, 0) == 0)
-            {
-                std::cout << "The client named: "<< user.username<< " has logged out"<< std::endl;
+    while (1){
+        if (recv(socketFd, buffer, 8192, 0) < 1){
+            if (recv(socketFd, buffer, 8192, 0) == 0){
+                std::cout<<"__LOGGING OUT__"<< "The client named: "<< user.username<< " has logged out"<< std::endl;
 				clients.erase(user.username);
             }
             break;
         }
         request.ParseFromString(buffer);
-        if (request.option()==1)
-        {
-            std::cout<<std::endl<<"RECEIVED INFO\nUsername: "<<request.newuser().username()<<"		ip: "<<request.newuser().ip()<<std::endl<<std::endl;
-            if (clients.count(request.newuser().username()) > 0)
-            {
-                std::cout<<std::endl<< "ERROR: Username already exists" <<std::endl<<std::endl;
-                SendErrorResponse(socketFd, "ERROR: Username already exists");
-                break;
-            }
-            chat::ServerResponse *response = new chat::ServerResponse();
-            response->set_option(1);
-            response->set_servermessage("SUCCESS: register");
-            response->set_code(200);
-			response->SerializeToString(&msgSerialized);
-            strcpy(buffer, msgSerialized.c_str());
-            send(socketFd, buffer, msgSerialized.size() + 1, 0);
-            std::cout << "SUCCESS:The user"<<user.username<<" was added with the socket: "<< socketFd<< std::endl;
-            user.username = request.newuser().username();
-            user.socketFd = socketFd;
-            user.status = 1;
-            strcpy(user.ip, newClientParams->ip);
-            clients[user.username] = &user;
-        }
+		switch (request.option()){
+			case 1:{
+				std::cout<<std::endl<<"__RECEIVED INFO__\nUsername: "<<request.newuser().username()<<"		ip: "<<request.newuser().ip();
+				if (clients.count(request.newuser().username()) > 0)
+				{
+					std::cout<<std::endl<< "ERROR: Username already exists" <<std::endl;
+					SendErrorResponse(socketFd, "ERROR: Username already exists");
+					break;
+				}
+				chat::ServerResponse *response = new chat::ServerResponse();
+				response->set_option(1);
+				response->set_servermessage("SUCCESS: register");
+				response->set_code(200);
+				response->SerializeToString(&msgSerialized);
+				strcpy(buffer, msgSerialized.c_str());
+				send(socketFd, buffer, msgSerialized.size() + 1, 0);
+				std::cout<<std::endl<<"SUCCESS:The user"<<user.username<<" was added with the socket: "<<socketFd<<std::endl;
+				user.username = request.newuser().username();
+				user.socketFd = socketFd;
+				user.status = 1;
+				strcpy(user.ip, newClientParams->ip);
+				clients[user.username] = &user;
+				break;
+			}
+			case 2:{
+				break;
+			}
+			case 3:{
+				break;
+			}
+			case 4:{
+				break;
+			}
+			case 5:{
+				break;
+			}
+			default:{
+				break;
+			}
+		}
 	}
 }
 
-int main(int argc, char const* argv[])
-{
+int main(int argc, char const* argv[]){
     GOOGLE_PROTOBUF_VERIFY_VERSION;
     //Cuando no se indica el puerto del server
-    if (argc != 2)
-    {
+    if (argc != 2){
         fprintf(stderr, "Use: server <server port>\n");
         return 1;
     }
@@ -102,30 +114,25 @@ int main(int argc, char const* argv[])
     server.sin_port = htons(port);
     server.sin_addr.s_addr = INADDR_ANY;
     memset(server.sin_zero, 0, sizeof server.sin_zero);
-    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
-    {
+    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1){
         fprintf(stderr, "ERROR: create socket\n");
         return 1;
     }
-    if (bind(socket_fd, (struct sockaddr *)&server, sizeof(server)) == -1)
-    {
+    if (bind(socket_fd, (struct sockaddr *)&server, sizeof(server)) == -1){
         close(socket_fd);
         fprintf(stderr, "ERROR: bind IP to socket.\n");
         return 2;
     }
-    if (listen(socket_fd, 5) == -1)
-    {
+    if (listen(socket_fd, 5) == -1){
         close(socket_fd);
         fprintf(stderr, "ERROR: listen socket\n");
         return 3;
     }
     printf("SUCCESS: listening on port-> %ld\n", port);
-    while (1)
-    {
+    while (1){
         new_conn_size = sizeof incoming_conn;
         new_conn_fd = accept(socket_fd, (struct sockaddr *)&incoming_conn, &new_conn_size);
-        if (new_conn_fd == -1)
-        {
+        if (new_conn_fd == -1){
             perror("ERROR: accept socket incomming connection\n");
             continue;
         }
