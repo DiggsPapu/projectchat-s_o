@@ -1,6 +1,7 @@
 // Client side C/C++ program to demonstrate Socket
 // programming
 #include <arpa/inet.h>
+#include <netdb.h>
 #include <stdio.h>
 #include <stdlib.h> 
 #include <string.h>
@@ -10,6 +11,8 @@
 #include "project.pb.h"
 #include <iostream>
 using namespace std;
+
+int connected, waitingForServerResponse, waitingForInput;
 // Print menu
 void printMenu(){
 	cout<<"1 -> Chat with everyone in the chat (Broadcasting)"<<endl;
@@ -20,105 +23,169 @@ void printMenu(){
 	cout<<"6 -> Help"<<endl;
 	cout<<"7 -> Exit"<<endl;
 }
-int main(int argc, char const* argv[])
+// get sockaddr
+void *get_in_addr(struct sockaddr *sa)
 {
-	printf("%s\n",argv[1]);
-	int status, valread, client_fd;
-	struct sockaddr_in serv_addr;
-	if (argc != 4)
+	if (sa->sa_family == AF_INET)
 	{
-		fprintf(stderr, "Client use: client <username> <server_ip> <server_port>\n");
-		exit(1);
-	}
-	if ((client_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		printf("\n Socket creation error \n");
-		return -1;
-	}
-    int port = atoi(argv[3]);
-	serv_addr.sin_family = AF_INET;
-	serv_addr.sin_port = htons(port);
-
-	// Convert IPv4 and IPv6 addresses from text to binary form
-	if (inet_pton(AF_INET, argv[2], &serv_addr.sin_addr)
-		<= 0) {
-		printf(
-			"\nInvalid address/ Address not supported \n");
-		return -1;
+		return &(((struct sockaddr_in *)sa)->sin_addr);
 	}
 
-	if ((status = connect(client_fd, (struct sockaddr*)&serv_addr,sizeof(serv_addr)))< 0) {
-		printf("\nConnection Failed \n");
-		return -1;
-	}
-	// Get ip address
-	char ip_v[80];
-	const char* p = inet_ntop(AF_INET, &serv_addr.sin_addr, ip_v, 80);
-    if(p != NULL)
-    {
-        std::cout << "Local IP address is: " << ip_v << std::endl;
-    }
-	// This is the message
-	char buffer[8192];
-	// This is the message serialized
-	std::string message_serialized;
-	// This is the protocol format of the UserRegister
-	chat::UserRegister *reg = new chat::UserRegister();
-	reg->set_username(argv[1]);//setusername
-	reg->set_ip(ip_v);//setip
-	// This is the protocol format of the UserRequest in this case 4 register
-	chat::UserRequest *request = new chat::UserRequest();
-	request->set_option(1); // option 1 means register
-	request->set_allocated_newuser(reg); //the user register entered
-	request->SerializeToString(&message_serialized); //serializetostring
-	// Sending the message
-	strcpy(buffer, message_serialized.c_str());
-	send(client_fd, buffer, message_serialized.size()+1, 0);
-	printf("Establishing connection ...\n");
-	// Reading a response from server
-	valread = read(client_fd, buffer, 8192);
-	// Server response protocol format
-	chat::ServerResponse *registerResponse = new chat::ServerResponse();
-	registerResponse->ParseFromString(buffer);
-	cout<<registerResponse->servermessage()<<endl;
-	// In case this connection is not good the socket is closed and exit from the program
-	if(registerResponse->code()!=200){
-		close(client_fd);
-		return 0;
-	}
-	
-	// This is while socket not closed
-	int option,open = 1;
-	while (open)
+	return &(((struct sockaddr_in6 *)sa)->sin6_addr);
+}
+void *listenToMessages(void *args)
+{
+	while (1)
 	{
-		printMenu();
-		cin>>option;
-		switch (option)
+		char bufferMsg[8192];
+		int *sockmsg = (int *)args;
+		chat::ServerResponse serverMsg;
+		int bytesReceived = recv(*sockmsg, bufferMsg, 8192, 0);
+		serverMsg.ParseFromString(bufferMsg);
+		if (serverMsg.code() != 200)
 		{
-			case 7:
-			{
-				chat::ChangeStatus *status = new chat::ChangeStatus();
-				status->set_newstatus(3);
-				status->set_username(argv[1]);
-				chat::UserRequest *ureq = new chat::UserRequest();
-				ureq->set_option(3); // option 1 means register
-				ureq->set_allocated_status(status); //the user register entered
-				ureq->SerializeToString(&message_serialized); //serializetostring
-				// Sending the message
-				strcpy(buffer, message_serialized.c_str());
-				send(client_fd, buffer, message_serialized.size()+1, 0);
-				close(client_fd);
-				printf("Logging out.\n");
-				open = 0;
-				break;
-			}
-			default:
-			{
-				cout<<"The option entered is invalid"<<endl;
-				break;
-			}
+			printf("________________________________________________________\n");
+			cout << "Error: "<< serverMsg.servermessage()<<endl;
+		}
+		else if (serverMsg.code() == 200 || serverMsg.option()==4)
+		{
+            chat::newMessage message = serverMsg.message();
+			printf("________________________________________________________\n");
+			std::cout <<message.sender()<<": \n"<<message.message()<< std::endl;
+		}
+		else
+		{
+			printf("ERROR: the server sent an invalid value\n");
+			break;
+		}
+
+		waitingForServerResponse = 0;
+
+		if (connected == 0)
+		{
+			pthread_exit(0);
 		}
 	}
-	// closing the connected socket
-	close(client_fd);
+}
+int main(int argc, char const* argv[])
+{
+    // Estructura de la coneccion
+	int sockfd, numbytes;
+	char buf[8192];
+	struct addrinfo hints, *servinfo, *p;
+	int rv;
+	char s[INET6_ADDRSTRLEN];
+
+	if (argc != 4)
+	{
+		fprintf(stderr, "Use: client <username> <server ip> <server port>\n");
+		exit(1);
+	}
+
+	memset(&hints, 0, sizeof hints);
+	hints.ai_family = AF_UNSPEC;
+	hints.ai_socktype = SOCK_STREAM;
+
+	if ((rv = getaddrinfo(argv[2], argv[3], &hints, &servinfo)) != 0)
+	{
+		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
+		return 1;
+	}
+
+	// Conectarse a la opcion que este disponible
+	for (p = servinfo; p != NULL; p = p->ai_next)
+	{
+		if ((sockfd = socket(p->ai_family, p->ai_socktype,
+							 p->ai_protocol)) == -1)
+		{
+			perror("ERROR: socket");
+			continue;
+		}
+
+		if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1)
+		{
+			perror("ERROR: connect client");
+			close(sockfd);
+			continue;
+		}
+
+		break;
+	}
+	// Indicar fallo al conectarse
+	if (p == NULL)
+	{
+		fprintf(stderr, "ERROR: failed to connect\n");
+		return 2;
+	}
+
+	//Completar la coneccion
+	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),
+			  s, sizeof s);
+	printf("CONNECTED IP: %s\n", s);
+	freeaddrinfo(servinfo);
+    // Message register
+	char buffer[8192];
+	std::string message_serialized;
+    chat::UserRequest *request = new chat::UserRequest();
+    chat::UserRegister *reg = new chat::UserRegister();
+    reg->set_username(argv[1]);
+    reg->set_ip(s);
+    request->set_option(1);
+    request->set_allocated_newuser(reg);
+    request->SerializeToString(&message_serialized);
+	strcpy(buffer, message_serialized.c_str());
+	send(sockfd, buffer, message_serialized.size() + 1, 0);
+    // Obtener response de servidor
+	recv(sockfd, buffer, 8192, 0);
+    chat::ServerResponse serverMessage;
+	serverMessage.ParseFromString(buffer);
+    // En caso de registro no exitoso
+	if(serverMessage.code() != 200){
+			std::cout << serverMessage.servermessage()<< std::endl;
+			return 0;
+	}
+    // En caso de registro exitoso
+	std::cout << "SERVER: "<< serverMessage.servermessage()<< std::endl;	
+	connected = 1;
+    // despachar thread que escucha mensajes del server
+	pthread_t thread_id;
+	pthread_attr_t attrs;
+	pthread_attr_init(&attrs);
+	pthread_create(&thread_id, &attrs, listenToMessages, (void *)&sockfd);
+	int client_opt, proceed = 1;
+    while (proceed)
+    {
+        printMenu();
+        cin>>client_opt;
+        while (waitingForServerResponse == 1){}
+        switch (client_opt)
+        {
+            case 7:{
+                int option;
+                printf("Log out\n1. y\n2. n\n");
+                std::cin >> option;
+                switch (option)
+                {
+                    case 1:{
+                        printf("Succesfully logged out\n");
+                        proceed = 0;
+                        break;
+                    }
+                    case 2:{
+                        break;
+                    }
+                    default:{
+                        printf("The value entered is invalid\n");
+                        break;
+                    }
+                }
+                break;
+            }
+            default:{
+                break;
+            }
+        }
+    }
+    
 	return 0;
 }

@@ -15,191 +15,128 @@
 #include "project.pb.h"
 using namespace std;
 sem_t semaphore_clients;
-struct ChatClient
+// Struct of user
+struct User
 {
     int socketFd;
     std::string username;
-    std::string ipAddr;
+    char ip[INET_ADDRSTRLEN];
     int status;
 };
-// Mutex
-pthread_mutex_t lock;
 // Client list
-std::unordered_map<std::string, ChatClient*> clients;
-struct ChatClient createClient(char buffer[8192]){
-	// Creating the class userequest to parse from string the buffer
-	chat::UserRequest *receivedValue = new chat::UserRequest();
-	receivedValue->ParseFromString(buffer);
-	struct ChatClient newUser;
-	newUser.username = (receivedValue->newuser().username());
-	newUser.status = 1;
-	newUser.ipAddr = (receivedValue->newuser().ip());
-	return newUser;
-}
-// Print the connected clients
-void printConnectedClients(){
-	for (auto i:clients){
-		cout<<"username: "<<i.first<<" ip: "<<i.second<<endl;
-	}
-}
-// To check if in client list
-int inClientList(struct ChatClient newUser){
-	char buffer[8192] = { 0 };
-	for (auto i:clients)
-		{
-			if(clients.find(newUser.username)!=clients.end() ) //|| i.second->ipAddr==receivedValue->newuser().ip()
-			{
-				// Sending a response of error
-				chat::ServerResponse *response = new chat::ServerResponse();
-				response->set_option(1);
-				response->set_code(400);
-				response->set_servermessage("Connection Error, the username/ip is already registered");
-				// This is the message serialized
-				std::string message_serialized;
-				response->SerializeToString(&message_serialized);
-				strcpy(buffer, message_serialized.c_str());
-				send(newUser.socketFd, buffer, message_serialized.size()+1, 0);
-				cout<<"Connection failed (ERROR 400) with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
-				close(newUser.socketFd);
-				return 0;
-			}
-		}
-		clients[newUser.username]=&newUser;
-		cout<<"Connection established with the username "<<newUser.username<<" and ip "<<newUser.ipAddr<<endl;
-		return 1;
-}
-// Handling client responses and everything in thread
-void *handlingClient(void *params)
+std::unordered_map<std::string, User*> clients;
+void SendErrorResponse(int socketFd, std::string errorMsg)
 {
-	struct ChatClient *user = (struct ChatClient *) params;
-	char buffer[8192];
-	// Sending a response of connection established
-	chat::ServerResponse *response = new chat::ServerResponse();
-	response->set_option(1);
-	response->set_code(200);
-	response->set_servermessage("Connection established correctly!\n");
-	// This is the message serialized
-	std::string message_serialized;
-	response->SerializeToString(&message_serialized);
-	strcpy(buffer, message_serialized.c_str());
-	send(user->socketFd, buffer, message_serialized.size()+1, 0);
-	printConnectedClients();
-	chat::UserRequest *request = new chat::UserRequest();
-	while (user->status!=3)
-	{
-		cout<<user->username<<" socket: "<<user->socketFd<<endl;
-		read(user->socketFd, buffer, 8192);	
-		request->ParseFromString(buffer);
-		switch (request->option())
-		{
-			case 0:
-			{
-				break;
-			}
-			case 3:
-			{
-				switch (request->status().newstatus())
-				{
-					case 1:
-					{
-						cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has changed status to ACTIVE"<<endl;
-						user->status = 1;
-						break;
-					}
-					case 2:
-					{
-						cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has changed status to OCCUPATED"<<endl;
-						user->status = 2;
-						break;
-					}
-					case 3:
-					{
-						cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has changed status to INACTIVE, logged out"<<endl;
-						user->status = 3;
-						clients.erase(user->username);
-						close(user->socketFd);
-						break;
-					}					
-					default:{cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" has sent an invalid status"<<endl;break;}
-				}
-				break;
-			}
-			default:
-			{
-				cout<<"Client "<<user->username<<" with the ip "<<user->ipAddr<<" sent an invalid value"<<endl;
-				break;
-			}			
-		}
-	}
-	cout<<"Connection ended with the username "<<user->username<<" and ip "<<user->ipAddr<<endl;
-	printConnectedClients();
-    pthread_exit(0);
+    std::string msgSerialized;
+    chat::ServerResponse *errorMessage = new chat::ServerResponse();
+    errorMessage->set_option(1);
+    errorMessage->set_code(400);
+	errorMessage->set_servermessage("Error");
+    errorMessage->SerializeToString(&msgSerialized);
+    char buffer[msgSerialized.size() + 1];
+    strcpy(buffer, msgSerialized.c_str());
+    send(socketFd, buffer, sizeof buffer, 0);
 }
+void *ThreadWork(void *params)
+{
+    struct User user;
+    struct User *newClientParams = (struct User *)params;
+    int socketFd = newClientParams->socketFd;
+    char buffer[8192];
+    std::string msgSerialized;
+    chat::UserRequest request ;
+	chat::UserRegister reg;
+    while (1)
+    {
+        if (recv(socketFd, buffer, 8192, 0) < 1)
+        {
+            if (recv(socketFd, buffer, 8192, 0) == 0)
+            {
+                std::cout << "The client named: "<< user.username<< " has logged out"<< std::endl;
+				clients.erase(user.username);
+            }
+            break;
+        }
+        request.ParseFromString(buffer);
+        if (request.option()==1)
+        {
+            std::cout<<std::endl<<"RECEIVED INFO\nUsername: "<<request.newuser().username()<<"		ip: "<<request.newuser().ip()<<std::endl<<std::endl;
+            if (clients.count(request.newuser().username()) > 0)
+            {
+                std::cout<<std::endl<< "ERROR: Username already exists" <<std::endl<<std::endl;
+                SendErrorResponse(socketFd, "ERROR: Username already exists");
+                break;
+            }
+            chat::ServerResponse *response = new chat::ServerResponse();
+            response->set_option(1);
+            response->set_servermessage("SUCCESS: register");
+            response->set_code(200);
+			response->SerializeToString(&msgSerialized);
+            strcpy(buffer, msgSerialized.c_str());
+            send(socketFd, buffer, msgSerialized.size() + 1, 0);
+            std::cout << "SUCCESS:The user"<<user.username<<" was added with the socket: "<< socketFd<< std::endl;
+            user.username = request.newuser().username();
+            user.socketFd = socketFd;
+            user.status = 1;
+            strcpy(user.ip, newClientParams->ip);
+            clients[user.username] = &user;
+        }
+	}
+}
+
 int main(int argc, char const* argv[])
 {
     GOOGLE_PROTOBUF_VERIFY_VERSION;
-	// Semaphore shared between threads init
-	sem_init(&semaphore_clients, 0, 1);
-    // In case the port is not indicated
+    //Cuando no se indica el puerto del server
     if (argc != 2)
     {
-        fprintf(stderr, "Use: server <serverport>\n");
+        fprintf(stderr, "Use: server <server port>\n");
         return 1;
     }
-	// Assigning port
-	int port = atoi(argv[1]);
-    /**
-     * CREATING THE SOCKET AND CONNFIGURING IT
-    */
-	int server_fd, new_socket;
-	struct sockaddr_in address, new_connection;
-	struct sockaddr_storage serverStorage;
-	int opt = 1;
-	socklen_t addrlen = sizeof(serverStorage);
-	char buffer[8192] = { 0 };
-	address.sin_family = AF_INET;
-    // // Aws ip public should be defined here:
-    // serv_addr.sin_addr.s_addr = inet_addr("dirección IP pública de la instancia de AWS");
-	address.sin_addr.s_addr = INADDR_ANY;
-	address.sin_port = htons(port);
-	memset(address.sin_zero, 0, sizeof address.sin_zero);
-	// Creating socket file descriptor
-	if ((server_fd = socket(AF_INET, SOCK_STREAM, 0)) < 0) {
-		perror("Server: socket failed");
-		exit(EXIT_FAILURE);
-	}
-	// Forcefully attaching socket to the port entered
-	if (bind(server_fd, (struct sockaddr*)&address,sizeof(address))< 0) {
-		perror("Server: bind failed IP socket->port");
-		exit(EXIT_FAILURE);
-	}
-	// Listen the entered connection
-	if (listen(server_fd, 5) != 0) { //5 first connection before refused.
-		perror("listen\n");
-		exit(EXIT_FAILURE);
-	}
-	printf("Listening on port %d\n", port);\
-	while (true){
-		addrlen = sizeof new_connection;
-		if ((new_socket= accept(server_fd, (struct sockaddr*)&serverStorage,(socklen_t*)&addrlen))< 0) {
-		perror("accept");
-		exit(EXIT_FAILURE);
-		}
-		// ____________CONNECTION_____________
-		// Got the response and saved it in buffer
-		recv(new_socket, &buffer, sizeof(buffer),0);
-		// Create a new user with a function and assigning sockets
-		struct ChatClient newUser = createClient(buffer);
-		newUser.socketFd = new_socket;
-		pthread_t thread_id;
-		if(inClientList(newUser)){
-			pthread_create(&thread_id,NULL, handlingClient, (void *)&newUser);
-		}
-	}
-	// closing the connected socket
-	close(new_socket);
-	// closing the listening socket
-	shutdown(server_fd, SHUT_RDWR);
+    long port = strtol(argv[1], NULL, 10);
+    sockaddr_in server, incoming_conn;
+    socklen_t new_conn_size;
+    int socket_fd, new_conn_fd;
+    char incoming_conn_addr[INET_ADDRSTRLEN];
+    server.sin_family = AF_INET;
+    server.sin_port = htons(port);
+    server.sin_addr.s_addr = INADDR_ANY;
+    memset(server.sin_zero, 0, sizeof server.sin_zero);
+    if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1)
+    {
+        fprintf(stderr, "ERROR: create socket\n");
+        return 1;
+    }
+    if (bind(socket_fd, (struct sockaddr *)&server, sizeof(server)) == -1)
+    {
+        close(socket_fd);
+        fprintf(stderr, "ERROR: bind IP to socket.\n");
+        return 2;
+    }
+    if (listen(socket_fd, 5) == -1)
+    {
+        close(socket_fd);
+        fprintf(stderr, "ERROR: listen socket\n");
+        return 3;
+    }
+    printf("SUCCESS: listening on port-> %ld\n", port);
+    while (1)
+    {
+        new_conn_size = sizeof incoming_conn;
+        new_conn_fd = accept(socket_fd, (struct sockaddr *)&incoming_conn, &new_conn_size);
+        if (new_conn_fd == -1)
+        {
+            perror("ERROR: accept socket incomming connection\n");
+            continue;
+        }
+        struct User newClient;
+        newClient.socketFd = new_conn_fd;
+        inet_ntop(AF_INET, &(incoming_conn.sin_addr), newClient.ip, INET_ADDRSTRLEN);
+        pthread_t thread_id;
+        pthread_attr_t attrs;
+        pthread_attr_init(&attrs);
+        pthread_create(&thread_id, &attrs, ThreadWork, (void *)&newClient);
+    }
     google::protobuf::ShutdownProtobufLibrary();
 	return 0;
 }
