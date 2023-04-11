@@ -128,6 +128,7 @@ int main(int argc, char const* argv[])
 	pthread_create(&thread_id, &attrs, listenToMessages, (void *)&sockfd);
 	int client_opt, proceed = 1;
     while (proceed){
+        request->Clear();
         printMenu();
         cin>>client_opt;
         while (waitingForServerResponse == 1){}
@@ -135,24 +136,11 @@ int main(int argc, char const* argv[])
             case 1:{
                 break;
             }
+            case 4:{
+                break;
+            }
             case 7:{
-                int option;
-                printf("Log out\n1. y\n2. n\n");
-                std::cin >> option;
-                switch (option){
-                    case 1:{
-                        printf("Succesfully logged out\n");
-                        proceed = 0;
-                        break;
-                    }
-                    case 2:{
-                        break;
-                    }
-                    default:{
-                        printf("The value entered is invalid\n");
-                        break;
-                    }
-                }
+				proceed = 0;
                 break;
             }
             default:{
