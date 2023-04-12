@@ -8,7 +8,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <string.h>
-#include "project.pb.h"
+#include "proyect.pb.h"
 #include <iostream>
 using namespace std;
 

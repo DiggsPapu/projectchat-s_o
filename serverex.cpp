@@ -12,7 +12,7 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include "project.pb.h"
+#include "proyect.pb.h"
 using namespace std;
 // Struct of user
 struct User{
