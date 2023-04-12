@@ -44,8 +44,8 @@ void *ThreadWork(void *params)
     int socketFd = newClientParams->socketFd;
     char buffer[8192];
     std::string msgSerialized;
-    chat::UserRequest request ;
-	chat::UserRegister reg;
+    chat::UserRequest *request = new chat::UserRequest();
+    chat::ServerResponse *response = new chat::ServerResponse();
     while (1){
         if (recv(socketFd, buffer, 8192, 0) < 1){
             if (recv(socketFd, buffer, 8192, 0) == 0){
@@ -54,17 +54,16 @@ void *ThreadWork(void *params)
             }
             break;
         }
-        request.ParseFromString(buffer);
-		switch (request.option()){
+        request->ParseFromString(buffer);
+		switch (request->option()){
 			case 1:{
-				std::cout<<std::endl<<"__RECEIVED INFO__\nUsername: "<<request.newuser().username()<<"		ip: "<<request.newuser().ip();
-				if (clients.count(request.newuser().username()) > 0)
+				std::cout<<std::endl<<"__RECEIVED INFO__\nUsername: "<<request->newuser().username()<<"		ip: "<<request->newuser().ip();
+				if (clients.count(request->newuser().username()) > 0)
 				{
 					std::cout<<std::endl<< "ERROR: Username already exists" <<std::endl;
 					SendErrorResponse(socketFd, "ERROR: Username already exists");
 					break;
 				}
-				chat::ServerResponse *response = new chat::ServerResponse();
 				response->set_option(1);
 				response->set_servermessage("SUCCESS: register");
 				response->set_code(200);
@@ -72,7 +71,7 @@ void *ThreadWork(void *params)
 				strcpy(buffer, msgSerialized.c_str());
 				send(socketFd, buffer, msgSerialized.size() + 1, 0);
 				std::cout<<std::endl<<"SUCCESS:The user"<<user.username<<" was added with the socket: "<<socketFd<<std::endl;
-				user.username = request.newuser().username();
+				user.username = request->newuser().username();
 				user.socketFd = socketFd;
 				user.status = 1;
 				strcpy(user.ip, newClientParams->ip);

@@ -142,7 +142,25 @@ int main(int argc, char const* argv[])
                 break;
             }
             case 4:{
-
+				info->Clear();
+				info->set_type_request(1);
+				request->set_option(2);
+				request->set_allocated_inforequest(info);
+				request->SerializeToString(&message_serialized);
+				strcpy(buffer, message_serialized.c_str());
+				send(sockfd, buffer, message_serialized.size() + 1, 0);
+                break;
+            }
+			case 5:{
+				cin>>buffer;
+				info->Clear();
+				info->set_type_request(2);
+				info->set_user(buffer);
+				request->set_option(2);
+				request->set_allocated_inforequest(info);
+				request->SerializeToString(&message_serialized);
+				strcpy(buffer, message_serialized.c_str());
+				send(sockfd, buffer, message_serialized.size() + 1, 0);
                 break;
             }
             case 7:{
