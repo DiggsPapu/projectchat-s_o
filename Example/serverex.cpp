@@ -152,6 +152,7 @@ void *ThreadWork(void *params)
 			}
 		}
 	}
+    return params;
 }
 
 int main(int argc, char const* argv[]){

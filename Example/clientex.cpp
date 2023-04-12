@@ -104,10 +104,7 @@ int main(int argc, char const* argv[])
 	std::string message_serialized;
     chat::UserRequest *request = new chat::UserRequest();
     chat::UserRegister *reg = new chat::UserRegister();
-	chat::UserInfoRequest *info = new chat::UserInfoRequest();
-	chat::AllConnectedUsers *a_users = new chat::AllConnectedUsers();
 	chat::newMessage *m_new = new chat::newMessage();
-	chat::ChangeStatus *newStatus = new chat::ChangeStatus();
     chat::ServerResponse *serverMessage = new chat::ServerResponse();
     // Message register
 	char buffer[8192];
@@ -147,7 +144,7 @@ int main(int argc, char const* argv[])
 				break;
 			}
 			case '3':{
-				newStatus->Clear();
+				chat::ChangeStatus *newStatus = new chat::ChangeStatus();
 				printf("Select between these optionsÑ\n1 -> ACTIVE\n2 -> OCCUPATED\n3 -> INACTIVE\nEnter the new status: ");
 				int op;cin>>op;
 				if (op==1){
@@ -169,7 +166,7 @@ int main(int argc, char const* argv[])
 				break;
 			}
             case '4':{
-				info->Clear();
+				chat::UserInfoRequest *info = new chat::UserInfoRequest();
 				info->set_type_request(1);
 				request->set_option(2);
 				request->set_allocated_inforequest(info);
@@ -180,6 +177,7 @@ int main(int argc, char const* argv[])
                 break;
             }
 			case '5':{
+				chat::UserInfoRequest *info = new chat::UserInfoRequest();
 				printf("Enter the username: ");
 				cin>>buffer;
 				info->Clear();
