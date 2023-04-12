@@ -1,5 +1,3 @@
-// Client side C/C++ program to demonstrate Socket
-// programming
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -11,7 +9,6 @@
 #include "proyect.pb.h"
 #include <iostream>
 using namespace std;
-
 int connected, waitingForServerResponse, waitingForInput;
 // get sockaddr
 void *get_in_addr(struct sockaddr *sa)
@@ -29,8 +26,7 @@ void *listenToMessages(void *args)
 		chat::ServerResponse *serverMsg = new chat::ServerResponse();
 		int bytesReceived = recv(*sockmsg, bufferMsg, 8192, 0);
 		serverMsg->ParseFromString(bufferMsg);
-		if (serverMsg->code() != 200)
-		{
+		if (serverMsg->code() != 200){
 			cout <<serverMsg->servermessage()<<endl;
 		}
 		else{
@@ -53,11 +49,8 @@ void *listenToMessages(void *args)
 				break;
 			}
 			case 4:{
-				if (serverMsg->message().message_type()){}
-				else{
-					std::cout<<serverMsg->servermessage()<<std::endl;
-					std::cout<<serverMsg->message().message()<<std::endl;
-				}
+				std::cout<<serverMsg->servermessage();
+				std::cout<<serverMsg->message().message()<<std::endl;
 			}
 			default:
 				break;
@@ -148,9 +141,8 @@ int main(int argc, char const* argv[])
             }
 			case '2':{
 				std::string recipient, message;
-				printf("Enter the username of the user that will receive the message: ");
+				printf("Enter the username of the recipient and the message in this format <username> message: ");
 				cin>>recipient;
-				printf("\nEnter the message that you want to send: ");
 				cin>>message;
 				chat::newMessage *m_new = new chat::newMessage();
 				m_new->set_message_type(0);
