@@ -40,6 +40,11 @@ void *listenToMessages(void *args)
 				if(serverMsg->has_userinforesponse()){
 					std::cout << serverMsg->servermessage()<<"\nUsername->"<<serverMsg->userinforesponse().username()<<"\nIP->"<<serverMsg->userinforesponse().ip()<<"\nStatus->"<<serverMsg->userinforesponse().status()<<std::endl;
 				}
+				else{
+					for(int i = 0; i<serverMsg->connectedusers().connectedusers_size(); i++){
+						std::cout << serverMsg->servermessage()<<"\nUsername->"<<serverMsg->connectedusers().connectedusers(i).username()<<"\nIP->"<<serverMsg->connectedusers().connectedusers(i).ip()<<"\nStatus->"<<serverMsg->connectedusers().connectedusers(i).status()<<std::endl;
+					}
+				}
 				break;
 			}
 			default:
@@ -55,7 +60,6 @@ void *listenToMessages(void *args)
 }
 int main(int argc, char const* argv[])
 {
-    // Estructura de la coneccion
 	int sockfd, numbytes;
 	char buf[8192];
 	struct addrinfo hints, *servinfo, *p;

@@ -82,8 +82,22 @@ void *ThreadWork(void *params)
 			}
 			case 2:{
                 if(request->inforequest().type_request()){
-                    
-                    std::cout<<"\nType of request: all users\n";
+                    chat::AllConnectedUsers *users = new chat::AllConnectedUsers();
+                    for(auto i:clients){
+                        chat::UserInfo *userI = new chat::UserInfo();
+                        userI->set_username(i.second->username);
+                        userI->set_status(i.second->status);
+                        userI->set_ip(i.second->ip);
+                        users->add_connectedusers()->CopyFrom(*userI);
+                    }
+                    response->set_servermessage("SUCCESS: userinfo of all connected clients");
+                    response->set_allocated_connectedusers(users);
+                    response->set_option(2);
+                    response->set_code(200);
+                    response->SerializeToString(&msgSerialized);
+                    strcpy(buffer, msgSerialized.c_str());
+                    send(socketFd, buffer, msgSerialized.size() + 1, 0);
+                    std::cout<<"\n__ALL CONNECTED CLIENTS__\nUser:"<<user.username<<"requested to show info of all connected clients\n";
                 }
                 else{
                     chat::UserInfo *userI = new chat::UserInfo();
