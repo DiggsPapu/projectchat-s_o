@@ -22,30 +22,31 @@ void *get_in_addr(struct sockaddr *sa)
 	return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 void *listenToMessages(void *args)
-{
-	while (1)
-	{
+{		
+	while (1){
 		char bufferMsg[8192];
 		int *sockmsg = (int *)args;
-		chat::ServerResponse serverMsg;
+		chat::ServerResponse *serverMsg = new chat::ServerResponse();
 		int bytesReceived = recv(*sockmsg, bufferMsg, 8192, 0);
-		serverMsg.ParseFromString(bufferMsg);
-		if (serverMsg.code() != 200)
+		serverMsg->ParseFromString(bufferMsg);
+		if (serverMsg->code() != 200)
 		{
-			printf("________________________________________________________\n");
-			cout << "ERROR: "<< serverMsg.servermessage()<<endl;
+			cout <<serverMsg->servermessage()<<endl;
 		}
-		else if (serverMsg.code() == 200 || serverMsg.option()==4)
-		{
-            chat::newMessage message = serverMsg.message();
-			printf("________________________________________________________\n");
-			std::cout <<message.sender()<<": \n"<<message.message()<< std::endl;
+		else{
+			switch (serverMsg->option())
+			{
+			case 2:{
+				if(serverMsg->has_userinforesponse()){
+					std::cout << serverMsg->servermessage()<<"\nUsername->"<<serverMsg->userinforesponse().username()<<"\nIP->"<<serverMsg->userinforesponse().ip()<<"\nStatus->"<<serverMsg->userinforesponse().status()<<std::endl;
+				}
+				break;
+			}
+			default:
+				break;
+			}
 		}
-		else
-		{
-			printf("ERROR: the server sent an invalid value\n");
-			break;
-		}
+		serverMsg->Clear();
 		waitingForServerResponse = 0;
 		if (connected == 0){
 			pthread_exit(0);
@@ -124,10 +125,10 @@ int main(int argc, char const* argv[])
 	int proceed = 1;
 	char client_opt;
     while (proceed){
+        while (waitingForServerResponse == 1){}
 		printf("1 -> Chat with everyone in the chat (Broadcasting)\n2 -> Send a private message\n3 -> Change status\n4 -> List connected users in the chat system\n5 -> Deploy info from a particular user\n6 -> Help\n7 -> Exit\nEnter the option: ");
         request->Clear();
         cin>>client_opt;
-        while (waitingForServerResponse == 1){}
         switch (client_opt){
             case '1':{
                 break;
@@ -140,6 +141,7 @@ int main(int argc, char const* argv[])
 				request->SerializeToString(&message_serialized);
 				strcpy(buffer, message_serialized.c_str());
 				send(sockfd, buffer, message_serialized.size() + 1, 0);
+				waitingForServerResponse = 1;
                 break;
             }
 			case '5':{
@@ -153,12 +155,7 @@ int main(int argc, char const* argv[])
 				request->SerializeToString(&message_serialized);
 				strcpy(buffer, message_serialized.c_str());
 				send(sockfd, buffer, message_serialized.size() + 1, 0);
-				recv(sockfd, buffer, 8192, 0);
-				serverMessage->ParseFromString(buffer);
-				if(serverMessage->code() != 200){std::cout << serverMessage->servermessage()<< std::endl;}
-				else{
-					std::cout << serverMessage->servermessage()<<"\nUsername->"<<serverMessage->userinforesponse().username()<<"\nIP->"<<serverMessage->userinforesponse().ip()<<"\nStatus->"<<serverMessage->userinforesponse().status()<<std::endl;
-				}
+				waitingForServerResponse = 1;
                 break;
             }
             case '7':{
@@ -170,6 +167,7 @@ int main(int argc, char const* argv[])
             }
         }
     }
+	pthread_cancel(thread_id);
 	printf("Thanks for using this server chat %s\nSee ya soon!",argv[1]);
 	return 0;
 }

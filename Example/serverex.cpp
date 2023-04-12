@@ -94,6 +94,7 @@ void *ThreadWork(void *params)
                         response->set_allocated_userinforesponse(userI);
                         response->set_servermessage("SUCCESS: userinfo of "+request->inforequest().user());
                         response->set_code(200);
+                        response->set_option(2);
                         response->SerializeToString(&msgSerialized);
                         strcpy(buffer, msgSerialized.c_str());
                         send(socketFd, buffer, msgSerialized.size() + 1, 0);
