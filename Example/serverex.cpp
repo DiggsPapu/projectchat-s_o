@@ -43,6 +43,7 @@ void *ThreadWork(void *params)
     struct User *newClientParams = (struct User *)params;
     int socketFd = newClientParams->socketFd;
     char buffer[8192];
+    // Server Structs
     std::string msgSerialized;
     chat::UserRequest *request = new chat::UserRequest();
     chat::ServerResponse *response = new chat::ServerResponse();
@@ -79,6 +80,12 @@ void *ThreadWork(void *params)
 				break;
 			}
 			case 2:{
+                if(request->inforequest().type_request()){
+                    std::cout<<"\nType of request: all users\n";
+                }
+                else{
+                    std::cout<<"\nType of request: one user->"<<request->inforequest().user()<<std::endl;
+                }
 				break;
 			}
 			case 3:{
