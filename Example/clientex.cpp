@@ -47,6 +47,10 @@ void *listenToMessages(void *args)
 				}
 				break;
 			}
+			case 3:{
+				std::cout<<serverMsg->servermessage()<<std::endl;
+				break;
+			}
 			default:
 				break;
 			}
@@ -135,8 +139,35 @@ int main(int argc, char const* argv[])
         cin>>client_opt;
         switch (client_opt){
             case '1':{
+
                 break;
             }
+			case '2':{
+
+				break;
+			}
+			case '3':{
+				newStatus->Clear();
+				printf("Select between these optionsÑ\n1 -> ACTIVE\n2 -> OCCUPATED\n3 -> INACTIVE\nEnter the new status: ");
+				int op;cin>>op;
+				if (op==1){
+					newStatus->set_newstatus(1);
+				}
+				else if (op==2){
+					newStatus->set_newstatus(2);
+				}
+				else if (op==3){
+					newStatus->set_newstatus(3);
+				}
+				newStatus->set_username(argv[1]);
+				request->set_option(3);
+				request->set_allocated_status(newStatus);
+				request->SerializeToString(&message_serialized);
+				strcpy(buffer, message_serialized.c_str());
+				send(sockfd, buffer, message_serialized.size() + 1, 0);
+				waitingForServerResponse = 1;
+				break;
+			}
             case '4':{
 				info->Clear();
 				info->set_type_request(1);

@@ -127,6 +127,18 @@ void *ThreadWork(void *params)
 				break;
 			}
 			case 3:{
+                clients[request->status().username()]->status = request->status().newstatus();
+                std::cout<<"\n__USER CHANGE STATUS SOLICITUDE__\nUser: "<<user.username<<" requested to change status.\nSUCCESS:status has changed successfully\n";
+                chat::ChangeStatus *sStatus = new chat::ChangeStatus();
+                sStatus->set_username(request->status().username());
+                sStatus->set_newstatus(request->status().newstatus());
+                response->set_allocated_change(sStatus);
+                response->set_servermessage("\nSUCCESS:\nUser: "+request->status().username()+" has changed status successfully\n");
+                response->set_code(200);
+                response->set_option(3);
+                response->SerializeToString(&msgSerialized);
+                strcpy(buffer, msgSerialized.c_str());
+                send(socketFd, buffer, msgSerialized.size() + 1, 0);
 				break;
 			}
 			case 4:{
