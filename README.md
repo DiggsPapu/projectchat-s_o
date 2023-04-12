@@ -17,3 +17,7 @@ Luego de eso, en el root, ingrese los siguientes comandos:
 `./client <nombre de usuario> 35.169.93.164 1404`
 
 El make tambien se encargara de compilar el protocolo.
+
+- Nota: Si desea abrir el cliente y conectarse a un servidor diferente del nuestro solo cambie la ip y el puerto:
+`./client <nombre de usuario> <usuario> <puerto>`
+
