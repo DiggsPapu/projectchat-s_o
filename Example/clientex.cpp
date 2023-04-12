@@ -13,16 +13,6 @@
 using namespace std;
 
 int connected, waitingForServerResponse, waitingForInput;
-// Print menu
-void printMenu(){
-	cout<<"1 -> Chat with everyone in the chat (Broadcasting)"<<endl;
-	cout<<"2 -> Send a private message"<<endl;
-	cout<<"3 -> Change status"<<endl;
-	cout<<"4 -> List connected users in the chat system"<<endl;
-	cout<<"5 -> Deploy info from a particular user"<<endl;
-	cout<<"6 -> Help"<<endl;
-	cout<<"7 -> Exit"<<endl;
-}
 // get sockaddr
 void *get_in_addr(struct sockaddr *sa)
 {
@@ -131,17 +121,18 @@ int main(int argc, char const* argv[])
 	pthread_attr_t attrs;
 	pthread_attr_init(&attrs);
 	pthread_create(&thread_id, &attrs, listenToMessages, (void *)&sockfd);
-	int client_opt, proceed = 1;
+	int proceed = 1;
+	char client_opt;
     while (proceed){
+		printf("1 -> Chat with everyone in the chat (Broadcasting)\n2 -> Send a private message\n3 -> Change status\n4 -> List connected users in the chat system\n5 -> Deploy info from a particular user\n6 -> Help\n7 -> Exit\nEnter the option: ");
         request->Clear();
-        printMenu();
         cin>>client_opt;
         while (waitingForServerResponse == 1){}
         switch (client_opt){
-            case 1:{
+            case '1':{
                 break;
             }
-            case 4:{
+            case '4':{
 				info->Clear();
 				info->set_type_request(1);
 				request->set_option(2);
@@ -151,7 +142,8 @@ int main(int argc, char const* argv[])
 				send(sockfd, buffer, message_serialized.size() + 1, 0);
                 break;
             }
-			case 5:{
+			case '5':{
+				printf("Enter the username: ");
 				cin>>buffer;
 				info->Clear();
 				info->set_type_request(0);
@@ -161,9 +153,15 @@ int main(int argc, char const* argv[])
 				request->SerializeToString(&message_serialized);
 				strcpy(buffer, message_serialized.c_str());
 				send(sockfd, buffer, message_serialized.size() + 1, 0);
+				recv(sockfd, buffer, 8192, 0);
+				serverMessage->ParseFromString(buffer);
+				if(serverMessage->code() != 200){std::cout << serverMessage->servermessage()<< std::endl;}
+				else{
+					std::cout << serverMessage->servermessage()<<"\nUsername->"<<serverMessage->userinforesponse().username()<<"\nIP->"<<serverMessage->userinforesponse().ip()<<"\nStatus->"<<serverMessage->userinforesponse().status()<<std::endl;
+				}
                 break;
             }
-            case 7:{
+            case '7':{
 				proceed = 0;
                 break;
             }

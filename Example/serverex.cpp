@@ -48,6 +48,7 @@ void *ThreadWork(void *params)
     chat::UserRequest *request = new chat::UserRequest();
     chat::ServerResponse *response = new chat::ServerResponse();
     while (1){
+        response->Clear();
         if (recv(socketFd, buffer, 8192, 0) < 1){
             if (recv(socketFd, buffer, 8192, 0) == 0){
                 std::cout<<std::endl<<"__LOGGING OUT__\n"<< "The client named: "<< user.username<< " has logged out"<< std::endl;
@@ -81,10 +82,32 @@ void *ThreadWork(void *params)
 			}
 			case 2:{
                 if(request->inforequest().type_request()){
+                    
                     std::cout<<"\nType of request: all users\n";
                 }
                 else{
-                    std::cout<<"\nType of request: one user->"<<request->inforequest().user()<<std::endl;
+                    chat::UserInfo *userI = new chat::UserInfo();
+                    try{
+                        userI->set_username(clients[request->inforequest().user()]->username);                    
+                        userI->set_ip(clients[request->inforequest().user()]->ip);
+                        userI->set_status(clients[request->inforequest().user()]->status);
+                        response->set_allocated_userinforesponse(userI);
+                        response->set_servermessage("SUCCESS: userinfo of "+request->inforequest().user());
+                        response->set_code(200);
+                        response->SerializeToString(&msgSerialized);
+                        strcpy(buffer, msgSerialized.c_str());
+                        send(socketFd, buffer, msgSerialized.size() + 1, 0);
+                        std::cout<<"\n__USER INFO SOLICITUDE__\nUser: "<<user.username<<" requested info of ->"<<request->inforequest().user()<<"\nSUCCESS: userinfo of "<<request->inforequest().user()<<std::endl;
+                    }
+                    catch(const std::exception& e){
+                        response->set_servermessage("ERROR: userinfo of "+request->inforequest().user());
+                        response->set_code(400);
+                        response->SerializeToString(&msgSerialized);
+                        strcpy(buffer, msgSerialized.c_str());
+                        send(socketFd, buffer, msgSerialized.size() + 1, 0);
+                        std::cout<<"\n__USER INFO SOLICITUDE__\nUser: "<<user.username<<" requested info of ->"<<request->inforequest().user()<<"\nERROR: userinfo of "<<request->inforequest().user()<<std::endl;
+                    }
+                    
                 }
 				break;
 			}
