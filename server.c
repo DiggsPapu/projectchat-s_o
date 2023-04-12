@@ -25,8 +25,8 @@ int main(int argc, char *argv[])
         // Afinet defines for tcp/ip
         server.sin_family = AF_INET; 
 
-                
-    } 
+	printf("\nCREATED\n");
+    }
     else
     {
         printf("The port wasn't entered.\n");
