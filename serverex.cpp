@@ -140,7 +140,35 @@ void *ThreadWork(void *params)
 				break;
 			}
 			case 4:{
-                if(request->message().message_type()){}
+                if(request->message().message_type()){
+                    std::cout<<"\n__SENDING GENERAL MESSAGE__\nUser: "<<request->message().sender()<<" is trying to send a general message";
+                    for (auto i:clients){
+                        if (i.first==request->message().sender()){
+                            chat::newMessage *response_message = new chat::newMessage();
+                            response_message->set_message("");
+                            response->set_allocated_message(response_message);
+                            response->set_servermessage("\nSUCCESS: You have sent a general message\n");
+                            response->set_code(200);
+                            response->set_option(4);
+                            response->SerializeToString(&msgSerialized);
+                            strcpy(buffer, msgSerialized.c_str());
+                            send(socketFd, buffer, msgSerialized.size() + 1, 0);
+                            std::cout<<"\nSUCCESS:User: "+request->message().sender()+" has sent the message successfully to the general chat\n";
+                        }
+                        else{
+                            chat::newMessage *message = new chat::newMessage();
+                            message->set_sender(user.username);
+                            message->set_message(request->message().message());
+                            response->set_allocated_message(message);
+                            response->set_servermessage("\nUser: "+request->message().sender()+" sends you a message\n");
+                            response->set_code(200);
+                            response->set_option(4);
+                            response->SerializeToString(&msgSerialized);
+                            strcpy(buffer, msgSerialized.c_str());
+                            send(i.second->socketFd, buffer, msgSerialized.size() + 1, 0);
+                        }
+                    }
+                }
                 else{
                     std::cout<<"\n__SENDING PRIVATE MESSAGE__\nUser: "<<request->message().sender()<<" is trying to send a private message to ->"<<request->message().recipient();
                     if(clients.count(request->message().recipient()) > 0){

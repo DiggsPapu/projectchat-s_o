@@ -136,12 +136,24 @@ int main(int argc, char const* argv[])
         cin>>client_opt;
         switch (client_opt){
             case '1':{
+				std::string message;
+				cout<<"Enter the message to be sent: ";
+				cin>>message;
+				chat::newMessage *m_new = new chat::newMessage();
+				m_new->set_message_type(1);
+				m_new->set_sender(argv[1]);
+				m_new->set_message(message);
+				request->set_option(4);
+				request->set_allocated_message(m_new);
+				request->SerializeToString(&message_serialized);
+				strcpy(buffer, message_serialized.c_str());
+				send(sockfd, buffer, message_serialized.size() + 1, 0);
 				waitingForServerResponse = 1;
                 break;
             }
 			case '2':{
 				std::string recipient, message;
-				printf("Enter the username of the recipient and the message in this format <username> message: ");
+				printf("Enter the username of the recipient and the message in this format <username> <message>: ");
 				cin>>recipient;
 				cin>>message;
 				chat::newMessage *m_new = new chat::newMessage();
