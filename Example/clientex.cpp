@@ -37,12 +37,13 @@ void *listenToMessages(void *args)
 			switch (serverMsg->option())
 			{
 			case 2:{
+				std::cout<<serverMsg->servermessage();
 				if(serverMsg->has_userinforesponse()){
-					std::cout << serverMsg->servermessage()<<"\nUsername->"<<serverMsg->userinforesponse().username()<<"\nIP->"<<serverMsg->userinforesponse().ip()<<"\nStatus->"<<serverMsg->userinforesponse().status()<<std::endl;
+					std::cout<<"\nUsername->"<<serverMsg->userinforesponse().username()<<"		IP->"<<serverMsg->userinforesponse().ip()<<"		Status->"<<serverMsg->userinforesponse().status()<<std::endl;
 				}
 				else{
 					for(int i = 0; i<serverMsg->connectedusers().connectedusers_size(); i++){
-						std::cout << serverMsg->servermessage()<<"\nUsername->"<<serverMsg->connectedusers().connectedusers(i).username()<<"\nIP->"<<serverMsg->connectedusers().connectedusers(i).ip()<<"\nStatus->"<<serverMsg->connectedusers().connectedusers(i).status()<<std::endl;
+						std::cout<<"\nUsername->"<<serverMsg->connectedusers().connectedusers(i).username()<<"		IP->"<<serverMsg->connectedusers().connectedusers(i).ip()<<"		Status->"<<serverMsg->connectedusers().connectedusers(i).status()<<std::endl;
 					}
 				}
 				break;
@@ -50,6 +51,13 @@ void *listenToMessages(void *args)
 			case 3:{
 				std::cout<<serverMsg->servermessage()<<std::endl;
 				break;
+			}
+			case 4:{
+				if (serverMsg->message().message_type()){}
+				else{
+					std::cout<<serverMsg->servermessage()<<std::endl;
+					// std::cout<<serverMsg->message().message()<<std::endl;
+				}
 			}
 			default:
 				break;
@@ -104,7 +112,6 @@ int main(int argc, char const* argv[])
 	std::string message_serialized;
     chat::UserRequest *request = new chat::UserRequest();
     chat::UserRegister *reg = new chat::UserRegister();
-	chat::newMessage *m_new = new chat::newMessage();
     chat::ServerResponse *serverMessage = new chat::ServerResponse();
     // Message register
 	char buffer[8192];
@@ -136,25 +143,44 @@ int main(int argc, char const* argv[])
         cin>>client_opt;
         switch (client_opt){
             case '1':{
-
+				waitingForServerResponse = 1;
                 break;
             }
 			case '2':{
-
+				std::string recipient, message;
+				printf("Enter the username of the user that will receive the message: ");
+				cin>>recipient;
+				printf("\nEnter the message that you want to send: ");
+				cin>>message;
+				chat::newMessage *m_new = new chat::newMessage();
+				m_new->set_message_type(0);
+				m_new->set_sender(argv[1]);
+				m_new->set_recipient(recipient);
+				m_new->set_message(message);
+				request->set_option(4);
+				request->set_allocated_message(m_new);
+				request->SerializeToString(&message_serialized);
+				strcpy(buffer, message_serialized.c_str());
+				send(sockfd, buffer, message_serialized.size() + 1, 0);
+				waitingForServerResponse = 1;
 				break;
 			}
 			case '3':{
 				chat::ChangeStatus *newStatus = new chat::ChangeStatus();
-				printf("Select between these optionsÑ\n1 -> ACTIVE\n2 -> OCCUPATED\n3 -> INACTIVE\nEnter the new status: ");
-				int op;cin>>op;
-				if (op==1){
+				printf("Select between these options\n1 -> ACTIVE\n2 -> OCCUPATED\n3 -> INACTIVE\nEnter the new status: ");
+				std::string op;cin>>op;
+				if (op=="1"||op=="ACTIVE"||op=="active"){
 					newStatus->set_newstatus(1);
 				}
-				else if (op==2){
+				else if (op=="2"||op=="OCCUPATED"||op=="occupated"){
 					newStatus->set_newstatus(2);
 				}
-				else if (op==3){
+				else if (op=="3"||op=="INACTIVE"||op=="inactive"){
 					newStatus->set_newstatus(3);
+				}
+				else{
+					printf("The value entered is invalid\n");
+					break;
 				}
 				newStatus->set_username(argv[1]);
 				request->set_option(3);

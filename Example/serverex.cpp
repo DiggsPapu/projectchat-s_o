@@ -14,10 +14,8 @@
 #include <semaphore.h>
 #include "project.pb.h"
 using namespace std;
-sem_t semaphore_clients;
 // Struct of user
-struct User
-{
+struct User{
     int socketFd;
     std::string username;
     char ip[INET_ADDRSTRLEN];
@@ -142,6 +140,46 @@ void *ThreadWork(void *params)
 				break;
 			}
 			case 4:{
+                if(request->message().message_type()){}
+                else{
+                    std::cout<<"\n__SENDING PRIVATE MESSAGE__\nUser: "<<request->message().sender()<<" is trying to send a private message to ->"<<request->message().recipient();
+                    if(clients.count(request->message().recipient()) > 0){
+                        chat::newMessage *message = new chat::newMessage();
+                        message->set_sender(user.username);
+                        message->set_recipient(request->message().recipient());
+                        // message->set_message(request->message().message());
+                        // response->set_allocated_message(message);
+                        // response->set_servermessage("\nSUCCESS:\nUser: "+request->message().sender()+" sends you a message\n");
+                        // response->set_code(200);
+                        // response->set_option(4);
+                        // response->SerializeToString(&msgSerialized);
+                        // strcpy(buffer, msgSerialized.c_str());
+                        // send(clients[request->message().recipient()]->socketFd, buffer, msgSerialized.size() + 1, 0);
+                        // std::cout<<"\nWAITING->User: sending the message from ->"+request->message().sender();
+                        message->set_message(" ");
+                        response->set_allocated_message(message);
+                        response->set_servermessage("\nSUCCESS:->User: "+request->message().sender()+" has sent the message successfully ->"+request->message().recipient()+"\n");
+                        response->set_code(200);
+                        response->set_option(4);
+                        response->SerializeToString(&msgSerialized);
+                        strcpy(buffer, msgSerialized.c_str());
+                        send(socketFd, buffer, msgSerialized.size() + 1, 0);
+                        std::cout<<"\nSUCCESS:User: "+request->message().sender()+" has sent the message successfully ->"+request->message().recipient()+"\n";
+                    }
+                    else{
+                        chat::newMessage *message = new chat::newMessage();
+                        message->set_sender(user.username);
+                        message->set_recipient(request->message().recipient());
+                        response->set_allocated_message(message);
+                        response->set_servermessage("\nERROR:\nUser: "+request->message().sender()+" tried to send a message to an unexisting user ->"+request->message().recipient()+"\n");
+                        response->set_code(400);
+                        response->set_option(4);
+                        response->SerializeToString(&msgSerialized);
+                        strcpy(buffer, msgSerialized.c_str());
+                        send(socketFd, buffer, msgSerialized.size() + 1, 0);
+                        std::cout<<"\nERROR:\nUser: "+request->message().sender()+" tried to send a message to an unexisting user ->"+request->message().recipient()+"\n";
+                    }
+                }
 				break;
 			}
 			case 5:{
