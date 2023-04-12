@@ -6,14 +6,9 @@
 
 ###  Compilacion del programa
 
-Ejecute el `make` estando en el root:
+Ejecute el `make` estando en el root.
 
-El make ejecutara los siguientes comandos:
-- `g++ -std=c++17 serverex.cpp project.pb.cc -o server `pkg-config --cflags --libs protobuf`
-- `g++ -std=c++17 clientex.cpp project.pb.cc -o client `pkg-config --cflags --libs protobuf``
-
-
-Luego de eso, en el root del directorio, ingrese los siguientes comandos:
+Luego de eso, en el root, ingrese los siguientes comandos:
 
 - Para abrir el servidor:
 `./server 1404`
@@ -21,3 +16,4 @@ Luego de eso, en el root del directorio, ingrese los siguientes comandos:
 - Para abrir el cliente y conectarse a AWS:
 `./client <nombre de usuario> 35.169.93.164 1404`
 
+El make tambien se encargara de compilar el protocolo.
