@@ -20,10 +20,10 @@ package chat;
 // pues el Chat general no requiere dstinatario 
 
 message newMessage {
-    bool message_type = 1;
-    string sender = 2;
+    required bool message_type = 1;
+    required string sender = 2;
     optional string recipient = 3;
-    string message = 4;
+    required string message = 4;
 }
 
 // ---------------- USER STRUCTS ----------------
@@ -31,8 +31,8 @@ message newMessage {
 // Al registrar un usuario se define su status por default, que es 1, o sea ACTIVO.
 
 message UserRegister {
-    string username = 1;
-    string ip = 2;
+    required string username = 1;
+    required string ip = 2;
 }
 
 // Se tiene un bool de identificacion del tipo de request
@@ -41,7 +41,7 @@ message UserRegister {
 // un solo usuario.
 
 message UserInfoRequest {
-    bool type_request = 1;
+    required bool type_request = 1;
     optional string user = 2;
 }
 
@@ -51,8 +51,8 @@ message UserInfoRequest {
 // o el usuario no existe, se devuelve un codigo de error 400.
 
 message ChangeStatus {
-    string username = 1;
-    int32 newStatus = 2;
+    required string username = 1;
+    required int32 newStatus = 2;
 }
 
 
@@ -71,7 +71,7 @@ message ChangeStatus {
 // 5 -> Heartbeat
 
 message UserRequest {
-    int32 option = 1;
+    required int32 option = 1;
     optional UserRegister newUser = 2;
     optional UserInfoRequest infoRequest = 3;
     optional ChangeStatus status = 4;
@@ -111,9 +111,9 @@ message AllConnectedUsers {
 // Segun su solicitud que haya hecho
 
 message ServerResponse {
-    int32 option = 1;
-    int32 code = 2;
-    string serverMessage = 3;
+    required int32 option = 1;
+    required int32 code = 2;
+    required string serverMessage = 3;
     optional AllConnectedUsers connectedUsers = 4;
     optional newMessage message = 5;
     optional UserInfo userInfoResponse = 6;

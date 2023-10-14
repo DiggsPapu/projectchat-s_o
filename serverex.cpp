@@ -1,7 +1,10 @@
 /**
  * Diego Andres Alonzo Medinilla - 20172
+ * Roberto Rios - 20979
  * S_O 2023 Project 1
-*/
+ * Chat 
+ */
+
 #include <iostream>
 #include <netinet/in.h>
 #include <stdio.h>
@@ -12,41 +15,59 @@
 #include <arpa/inet.h>
 #include <pthread.h>
 #include <semaphore.h>
-#include "project.pb.h"
+#include "proyect.pb.h"
+
+
 using namespace std;
-// Struct of user
+
+// Struct of user: para modelar el socket por el que se conecta, un username, su ip y su status basandose en protoc
 struct User{
     int socketFd;
     std::string username;
     char ip[INET_ADDRSTRLEN];
     int status;
 };
+
+
 // Client list
 std::unordered_map<std::string, User*> clients;
+
+
+// funcion para enviar errores segun el retorno del codigo
 void SendErrorResponse(int socketFd, std::string errorMsg)
 {
     std::string msgSerialized;
     chat::ServerResponse *errorMessage = new chat::ServerResponse();
     errorMessage->set_option(1);
     errorMessage->set_code(400);
-	errorMessage->set_servermessage("Error");
+    errorMessage->set_servermessage("Error");
     errorMessage->SerializeToString(&msgSerialized);
     char buffer[msgSerialized.size() + 1];
     strcpy(buffer, msgSerialized.c_str());
     send(socketFd, buffer, sizeof buffer, 0);
 }
+
+
+// ---------------------------- logica de recibir y enviar respuestas ----------------------------
+// esta funcion se pasa a un thread para recibir y enviar mensajes serializados de los clientes que se conecten a el
+// este hilo esta esperando en todo momento que le envien informacion  
 void *ThreadWork(void *params)
 {
+    // recibe un usuario y lo conecta a un socket
     struct User user;
     struct User *newClientParams = (struct User *)params;
     int socketFd = newClientParams->socketFd;
     char buffer[8192];
+	
     // Server Structs
     std::string msgSerialized;
     chat::UserRequest *request = new chat::UserRequest();
     chat::ServerResponse *response = new chat::ServerResponse();
+	
     while (1){
         response->Clear();
+	
+	// recibe la opcion 7 del cliente, entonces lo desconecta
         if (recv(socketFd, buffer, 8192, 0) < 1){
             if (recv(socketFd, buffer, 8192, 0) == 0){
                 std::cout<<std::endl<<"__LOGGING OUT__\n"<< "The client named: "<< user.username<< " has logged out"<< std::endl;
@@ -54,6 +75,8 @@ void *ThreadWork(void *params)
             }
             break;
         }
+	
+	// si no es eso, hay opciones que ejecutar:
         request->ParseFromString(buffer);
 		switch (request->option()){
 			case 1:{
@@ -140,7 +163,35 @@ void *ThreadWork(void *params)
 				break;
 			}
 			case 4:{
-                if(request->message().message_type()){}
+                if(request->message().message_type()){
+                    std::cout<<"\n__SENDING GENERAL MESSAGE__\nUser: "<<request->message().sender()<<" is trying to send a general message";
+                    for (auto i:clients){
+                        if (i.first==request->message().sender()){
+                            chat::newMessage *response_message = new chat::newMessage();
+                            response_message->set_message("");
+                            response->set_allocated_message(response_message);
+                            response->set_servermessage("\nSUCCESS: You have sent a general message\n");
+                            response->set_code(200);
+                            response->set_option(4);
+                            response->SerializeToString(&msgSerialized);
+                            strcpy(buffer, msgSerialized.c_str());
+                            send(socketFd, buffer, msgSerialized.size() + 1, 0);
+                            std::cout<<"\nSUCCESS:User: "+request->message().sender()+" has sent the message successfully to the general chat\n";
+                        }
+                        else{
+                            chat::newMessage *message = new chat::newMessage();
+                            message->set_sender(user.username);
+                            message->set_message(request->message().message());
+                            response->set_allocated_message(message);
+                            response->set_servermessage("\nUser: "+request->message().sender()+" sends you a message\n");
+                            response->set_code(200);
+                            response->set_option(4);
+                            response->SerializeToString(&msgSerialized);
+                            strcpy(buffer, msgSerialized.c_str());
+                            send(i.second->socketFd, buffer, msgSerialized.size() + 1, 0);
+                        }
+                    }
+                }
                 else{
                     std::cout<<"\n__SENDING PRIVATE MESSAGE__\nUser: "<<request->message().sender()<<" is trying to send a private message to ->"<<request->message().recipient();
                     if(clients.count(request->message().recipient()) > 0){
@@ -149,19 +200,20 @@ void *ThreadWork(void *params)
                         message->set_recipient(request->message().recipient());
                         message->set_message(request->message().message());
                         response->set_allocated_message(message);
-                        response->set_servermessage("\nSUCCESS:\nUser: "+request->message().sender()+" sends you a message\n");
+                        response->set_servermessage("\nUser: "+request->message().sender()+" sends you a message\n");
                         response->set_code(200);
                         response->set_option(4);
                         response->SerializeToString(&msgSerialized);
                         strcpy(buffer, msgSerialized.c_str());
                         send(clients[request->message().recipient()]->socketFd, buffer, msgSerialized.size() + 1, 0);
-                        // std::cout<<"\nWAITING->User: sending the message from ->"+request->message().sender();
-                        // message->set_message(" ");
-                        // response->set_allocated_message(message);
-                        // response->set_servermessage("\nSUCCESS:->User: "+request->message().sender()+" has sent the message successfully ->"+request->message().recipient()+"\n");
-                        // response->set_code(200);
-                        // response->set_option(4);
-                        // response->SerializeToString(&msgSerialized);
+                        response->Clear();
+                        chat::newMessage *response_message = new chat::newMessage();
+                        response_message->set_message("");
+                        response->set_allocated_message(response_message);
+                        response->set_servermessage("\nSUCCESS: You have sent the private message to "+request->message().recipient()+" successfully\n");
+                        response->set_code(200);
+                        response->set_option(4);
+                        response->SerializeToString(&msgSerialized);
                         strcpy(buffer, msgSerialized.c_str());
                         send(socketFd, buffer, msgSerialized.size() + 1, 0);
                         std::cout<<"\nSUCCESS:User: "+request->message().sender()+" has sent the message successfully ->"+request->message().recipient()+"\n";
@@ -192,14 +244,21 @@ void *ThreadWork(void *params)
 	}
     return params;
 }
+// ---------------------------- fin logica logica de recibir y enviar respuestas ----------------------------
 
+
+
+// ---------------------------- main del servidor ----------------------------
 int main(int argc, char const* argv[]){
     GOOGLE_PROTOBUF_VERIFY_VERSION;
-    //Cuando no se indica el puerto del server
+    
+    // Cuando no se indica el puerto del server en parametros
     if (argc != 2){
         fprintf(stderr, "Use: server <server port>\n");
         return 1;
     }
+    
+    // inicializar el server en base a los parametros ingresados
     long port = strtol(argv[1], NULL, 10);
     sockaddr_in server, incoming_conn;
     socklen_t new_conn_size;
@@ -209,28 +268,44 @@ int main(int argc, char const* argv[]){
     server.sin_port = htons(port);
     server.sin_addr.s_addr = INADDR_ANY;
     memset(server.sin_zero, 0, sizeof server.sin_zero);
+
+    // si hubo error al crear el socket para el cliente
     if ((socket_fd = socket(AF_INET, SOCK_STREAM, 0)) == -1){
         fprintf(stderr, "ERROR: create socket\n");
         return 1;
     }
+
+    // si hubo error al crear el socket para el cliente y enlazar ip
     if (bind(socket_fd, (struct sockaddr *)&server, sizeof(server)) == -1){
         close(socket_fd);
         fprintf(stderr, "ERROR: bind IP to socket.\n");
         return 2;
     }
+	
+    // si hubo error al crear el socket para esperar respuestas
     if (listen(socket_fd, 5) == -1){
         close(socket_fd);
         fprintf(stderr, "ERROR: listen socket\n");
         return 3;
     }
+
+
+    // si no hubo errores se puede proceder con el listen del server
     printf("SUCCESS: listening on port-> %ld\n", port);
+	
     while (1){
+	    
+        // la funcion accept nos permite ver si se reciben o envian mensajes
         new_conn_size = sizeof incoming_conn;
         new_conn_fd = accept(socket_fd, (struct sockaddr *)&incoming_conn, &new_conn_size);
+	    
+        // si hubo error al crear el socket para el cliente
         if (new_conn_fd == -1){
             perror("ERROR: accept socket incomming connection\n");
             continue;
         }
+	    
+        // si no hubo error al crear el socket para el cliente, se procede a crear un hilo con la funcion ThreadWork para que el usuario se conecte
         struct User newClient;
         newClient.socketFd = new_conn_fd;
         inet_ntop(AF_INET, &(incoming_conn.sin_addr), newClient.ip, INET_ADDRSTRLEN);
@@ -239,6 +314,8 @@ int main(int argc, char const* argv[]){
         pthread_attr_init(&attrs);
         pthread_create(&thread_id, &attrs, ThreadWork, (void *)&newClient);
     }
+	
+    // si hubo error al crear el socket para el cliente
     google::protobuf::ShutdownProtobufLibrary();
 	return 0;
 }

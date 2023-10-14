@@ -1,5 +1,14 @@
-// Client side C/C++ program to demonstrate Socket
-// programming
+/**
+ * Diego Andres Alonzo Medinilla - 20172
+ * Roberto Rios - 20979
+ * S_O 2023 Project 1
+ * Chat 
+ *
+ * Esta es la implementacion del menu y las funciones del cliente para comunicarse al servidor
+ *
+ */
+
+
 #include <arpa/inet.h>
 #include <netdb.h>
 #include <stdio.h>
@@ -8,12 +17,16 @@
 #include <sys/socket.h>
 #include <unistd.h>
 #include <string.h>
-#include "project.pb.h"
+#include "proyect.pb.h"
 #include <iostream>
+
 using namespace std;
 
+// inicializar variables globales
 int connected, waitingForServerResponse, waitingForInput;
-// get sockaddr
+
+// ----------------------------------------- logica para las funciones del controlador, enviar y recibir info del server -----------------------------------------
+// funcion para enviar a un thread y obtener el ip de un usuario 
 void *get_in_addr(struct sockaddr *sa)
 {
 	if (sa->sa_family == AF_INET){
@@ -21,19 +34,27 @@ void *get_in_addr(struct sockaddr *sa)
 	}
 	return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
+
+
+// este es como un event listener que dependiendo del input del usuario preguntara por una u otra funcion
 void *listenToMessages(void *args)
-{		
+{	
+	// siempre esta escuchando y espera por una opcion que ingrese el usuario
 	while (1){
+		
+		// inicializamos las variables para enviar el mensaje del usuario 
 		char bufferMsg[8192];
 		int *sockmsg = (int *)args;
 		chat::ServerResponse *serverMsg = new chat::ServerResponse();
 		int bytesReceived = recv(*sockmsg, bufferMsg, 8192, 0);
 		serverMsg->ParseFromString(bufferMsg);
-		if (serverMsg->code() != 200)
-		{
+		
+		// si no nos logramos conectar al servidor, se devuelve un error 
+		if (serverMsg->code() != 200){
 			cout <<serverMsg->servermessage()<<endl;
-		}
-		else{
+			
+		} else {
+			// para enviar mensajes, segun el protocolo, se utiliza el server response, el server message, y la ip 
 			switch (serverMsg->option())
 			{
 			case 2:{
@@ -53,16 +74,14 @@ void *listenToMessages(void *args)
 				break;
 			}
 			case 4:{
-				if (serverMsg->message().message_type()){}
-				else{
-					std::cout<<serverMsg->servermessage()<<std::endl;
-					std::cout<<serverMsg->message().message()<<std::endl;
-				}
+				std::cout<<serverMsg->servermessage();
+				std::cout<<serverMsg->message().message()<<std::endl;
 			}
 			default:
 				break;
 			}
 		}
+		// si se desconecta del server 
 		serverMsg->Clear();
 		waitingForServerResponse = 0;
 		if (connected == 0){
@@ -70,64 +89,92 @@ void *listenToMessages(void *args)
 		}
 	}
 }
+
+
+// ----------------------------------------- inicio main del cliente -----------------------------------------
+// main con opciones para que ingrese el usuario
 int main(int argc, char const* argv[])
 {
+	
+	// ----------------------------------------- funciones y variables para el controlador del cliente -----------------------------------------
+	// variables para enviar info al server
 	int sockfd, numbytes;
 	char buf[8192];
 	struct addrinfo hints, *servinfo, *p;
 	int rv;
 	char s[INET6_ADDRSTRLEN];
+	
+	// si no se ingresan los params necesarios
 	if (argc != 4){
 		fprintf(stderr, "Use: client <username> <server ip> <server port>\n");
 		exit(1);
 	}
+	
+	// mas variables para configurar el server 
 	memset(&hints, 0, sizeof hints);
 	hints.ai_family = AF_UNSPEC;
 	hints.ai_socktype = SOCK_STREAM;
+	
+	// si no se recibe la informacion del servidor hay error
 	if ((rv = getaddrinfo(argv[2], argv[3], &hints, &servinfo)) != 0){
 		fprintf(stderr, "getaddrinfo: %s\n", gai_strerror(rv));
 		return 1;
 	}
+	
+	// buscar en los sockets si hay errores
 	for (p = servinfo; p != NULL; p = p->ai_next)
 	{
-		if ((sockfd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1){
+		// aqui se encuentra si hay error
+		if ((sockfd = socket(p->ai_family, p->ai_socktype,p->ai_protocol)) == -1) {
 			perror("ERROR: socket");
 			continue;
 		}
-        if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1){
+		
+		// aqui se encuentra si hay error
+        	if (connect(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
 			perror("ERROR: connect client");
 			close(sockfd);
 			continue;
 		}
 		break;
 	}
-	if (p == NULL){
+	
+	// no se encontro un socket
+	if (p == NULL) {
 		fprintf(stderr, "ERROR: failed to connect\n");
 		return 2;
 	}
+	
+	// se si encontro el socket
 	inet_ntop(p->ai_family, get_in_addr((struct sockaddr *)p->ai_addr),s, sizeof s);
 	printf("CONNECTED IP: %s\n", s);
 	freeaddrinfo(servinfo);
+	
 	// Defining the structs to send messages using the protocol
 	std::string message_serialized;
-    chat::UserRequest *request = new chat::UserRequest();
-    chat::UserRegister *reg = new chat::UserRegister();
-    chat::ServerResponse *serverMessage = new chat::ServerResponse();
-    // Message register
+        chat::UserRequest *request = new chat::UserRequest();
+        chat::UserRegister *reg = new chat::UserRegister();
+        chat::ServerResponse *serverMessage = new chat::ServerResponse();
+	
+        // Message register
 	char buffer[8192];
-    reg->set_username(argv[1]);
-    reg->set_ip(s);
-    request->set_option(1);
-    request->set_allocated_newuser(reg);
-    request->SerializeToString(&message_serialized);
+        reg->set_username(argv[1]);
+        reg->set_ip(s);
+        request->set_option(1);
+        request->set_allocated_newuser(reg);
+        request->SerializeToString(&message_serialized);
 	strcpy(buffer, message_serialized.c_str());
 	send(sockfd, buffer, message_serialized.size() + 1, 0);
 	recv(sockfd, buffer, 8192, 0);
 	serverMessage->ParseFromString(buffer);
-	if(serverMessage->code() != 200){
-			std::cout << serverMessage->servermessage()<< std::endl;
-			return 0;
+	
+	// si hubo error al buscar 
+	if (serverMessage->code() != 200) {
+		std::cout << serverMessage->servermessage()<< std::endl;
+		return 0;
 	}
+	
+	// si se superaron los errores, entonces se puede abrir un fork y hostear al cliente ahi
 	std::cout << "SERVER: "<< serverMessage->servermessage()<< std::endl;	
 	connected = 1;
 	pthread_t thread_id;
@@ -136,21 +183,44 @@ int main(int argc, char const* argv[])
 	pthread_create(&thread_id, &attrs, listenToMessages, (void *)&sockfd);
 	int proceed = 1;
 	char client_opt;
+	
+    // esperar a que el cliente se conecte correctamente al servidor y abrir el controlador
+
+    
+    // ----------------------------------------- inicio controlador del cliente -----------------------------------------
     while (proceed){
-        while (waitingForServerResponse == 1){}
-		printf("1 -> Chat with everyone in the chat (Broadcasting)\n2 -> Send a private message\n3 -> Change status\n4 -> List connected users in the chat system\n5 -> Deploy info from a particular user\n6 -> Help\n7 -> Exit\nEnter the option: ");
+	
+        while (waitingForServerResponse == 1) {}
+	printf("1 -> Chat with everyone in the chat (Broadcasting)\n2 -> Send a private message\n3 -> Change status\n4 -> List connected users in the chat system\n5 -> Deploy info from a particular user\n6 -> Help\n7 -> Exit\nEnter the option: ");
         request->Clear();
         cin>>client_opt;
+	
+	// para ingresar las opciones en cliente
         switch (client_opt){
-            case '1':{
+		
+		// ingresar un mensaje para todos
+		case '1':{
+				std::string message;
+				cout<<"Enter the message to be sent: ";
+				cin>>message;
+				chat::newMessage *m_new = new chat::newMessage();
+				m_new->set_message_type(1);
+				m_new->set_sender(argv[1]);
+				m_new->set_message(message);
+				request->set_option(4);
+				request->set_allocated_message(m_new);
+				request->SerializeToString(&message_serialized);
+				strcpy(buffer, message_serialized.c_str());
+				send(sockfd, buffer, message_serialized.size() + 1, 0);
 				waitingForServerResponse = 1;
-                break;
-            }
-			case '2':{
+                		break;
+		}
+			
+		// ingresar un mensaje privado
+		case '2':{
 				std::string recipient, message;
-				printf("Enter the username of the user that will receive the message: ");
+				printf("Enter the username of the recipient and the message in this format <username> <message>: ");
 				cin>>recipient;
-				printf("\nEnter the message that you want to send: ");
 				cin>>message;
 				chat::newMessage *m_new = new chat::newMessage();
 				m_new->set_message_type(0);
@@ -164,8 +234,10 @@ int main(int argc, char const* argv[])
 				send(sockfd, buffer, message_serialized.size() + 1, 0);
 				waitingForServerResponse = 1;
 				break;
-			}
-			case '3':{
+		}
+			
+		// ingresar un nuevo estatus
+		case '3':{
 				chat::ChangeStatus *newStatus = new chat::ChangeStatus();
 				printf("Select between these options\n1 -> ACTIVE\n2 -> OCCUPATED\n3 -> INACTIVE\nEnter the new status: ");
 				std::string op;cin>>op;
@@ -190,8 +262,10 @@ int main(int argc, char const* argv[])
 				send(sockfd, buffer, message_serialized.size() + 1, 0);
 				waitingForServerResponse = 1;
 				break;
-			}
-            case '4':{
+		}
+			
+		// mostrar a todos los usuarios conectados
+            	case '4':{
 				chat::UserInfoRequest *info = new chat::UserInfoRequest();
 				info->set_type_request(1);
 				request->set_option(2);
@@ -200,9 +274,11 @@ int main(int argc, char const* argv[])
 				strcpy(buffer, message_serialized.c_str());
 				send(sockfd, buffer, message_serialized.size() + 1, 0);
 				waitingForServerResponse = 1;
-                break;
-            }
-			case '5':{
+                		break;
+		}
+		
+		// solicitar informacion de usuarios
+		case '5':{
 				chat::UserInfoRequest *info = new chat::UserInfoRequest();
 				printf("Enter the username: ");
 				cin>>buffer;
@@ -215,17 +291,21 @@ int main(int argc, char const* argv[])
 				strcpy(buffer, message_serialized.c_str());
 				send(sockfd, buffer, message_serialized.size() + 1, 0);
 				waitingForServerResponse = 1;
-                break;
-            }
-            case '7':{
+                		break;
+		}
+		
+		// cerrar sesion
+		case '7':{
 				proceed = 0;
-                break;
-            }
-            default:{
-                break;
-            }
+                		break;
+            	}
+			
+            	default:{
+                	break;
+            	}
         }
     }
+	// al cerrar sesion, se destruye el hilo
 	pthread_cancel(thread_id);
 	printf("Thanks for using this server chat %s\nSee ya soon!",argv[1]);
 	return 0;
